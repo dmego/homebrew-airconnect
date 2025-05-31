@@ -2,7 +2,7 @@
 
 # AirConnect Service Manager
 # Manages both AirCast and AirUPnP services as a unified service
-# Version: 1.0.0
+# Version: 1.0.1
 # Author: dmego
 # License: MIT
 
@@ -63,6 +63,35 @@ is_running() {
     [[ -f "$pid_file" ]] && kill -0 "$(cat "$pid_file")" 2>/dev/null
 }
 
+# Check for Gatekeeper issues
+check_gatekeeper() {
+    local binary="$1"
+    local binary_name=$(basename "$binary")
+    
+    # Check if file has quarantine attribute
+    if xattr -l "$binary" 2>/dev/null | grep -q "com.apple.quarantine"; then
+        log_error "$binary_name is quarantined by macOS Gatekeeper"
+        log_error "Run: xattr -d com.apple.quarantine $binary"
+        return 1
+    fi
+    
+    # Try to execute binary with --help to test if it's blocked
+    if ! "$binary" --help >/dev/null 2>&1; then
+        local exit_code=$?
+        if [[ $exit_code -eq 137 ]]; then  # SIGKILL (Killed: 9)
+            log_error "$binary_name was killed by macOS Gatekeeper (exit code 137)"
+            log_error "This usually means the binary is unsigned or blocked by security settings"
+            log_error "Solutions:"
+            log_error "1. Remove quarantine: xattr -d com.apple.quarantine $binary"
+            log_error "2. Allow in Security & Privacy settings"
+            log_error "3. Reinstall with: brew reinstall airconnect"
+            return 1
+        fi
+    fi
+    
+    return 0
+}
+
 # Start AirCast service
 start_aircast() {
     log "Starting AirCast service..."
@@ -80,6 +109,11 @@ start_aircast() {
         return 1
     fi
     
+    # Check for Gatekeeper issues
+    if ! check_gatekeeper "$AIRCAST_BIN"; then
+        return 1
+    fi
+    
     # Start AirCast in background
     nohup $AIRCAST_BIN $AIRCAST_ARGS > "$AIRCAST_LOG" 2>&1 &
     local pid=$!
@@ -93,6 +127,11 @@ start_aircast() {
         return 0
     else
         log_error "Failed to start AirCast"
+        # Check if it was killed by Gatekeeper
+        if tail -1 "$AIRCAST_LOG" 2>/dev/null | grep -q "Killed"; then
+            log_error "AirCast was killed, possibly by macOS Gatekeeper"
+            check_gatekeeper "$AIRCAST_BIN"
+        fi
         rm -f "$AIRCAST_PID"
         return 1
     fi
@@ -115,6 +154,11 @@ start_airupnp() {
         return 1
     fi
     
+    # Check for Gatekeeper issues
+    if ! check_gatekeeper "$AIRUPNP_BIN"; then
+        return 1
+    fi
+    
     # Start AirUPnP in background
     nohup $AIRUPNP_BIN $AIRUPNP_ARGS > "$AIRUPNP_LOG" 2>&1 &
     local pid=$!
@@ -128,6 +172,11 @@ start_airupnp() {
         return 0
     else
         log_error "Failed to start AirUPnP"
+        # Check if it was killed by Gatekeeper
+        if tail -1 "$AIRUPNP_LOG" 2>/dev/null | grep -q "Killed"; then
+            log_error "AirUPnP was killed, possibly by macOS Gatekeeper"
+            check_gatekeeper "$AIRUPNP_BIN"
+        fi
         rm -f "$AIRUPNP_PID"
         return 1
     fi
@@ -237,7 +286,7 @@ main() {
     # Record our PID
     echo $$ > "$SERVICE_PID"
     
-    log "AirConnect service manager starting (version 1.0.0)"
+    log "AirConnect service manager starting (version 1.0.1)"
     log "Service manager PID: $$"
     log "Configuration file: $CONFIG_FILE"
     log "Log directory: $LOG_DIR"
@@ -257,6 +306,8 @@ main() {
     
     if [[ $start_errors -gt 0 ]]; then
         log_error "Failed to start $start_errors service(s)"
+        log_error "If you see Gatekeeper errors, try reinstalling:"
+        log_error "  brew uninstall airconnect && brew install airconnect"
         cleanup
         exit 1
     fi

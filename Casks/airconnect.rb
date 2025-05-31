@@ -187,13 +187,32 @@ cask "airconnect" do
     process_type :background
   end
 
-  # Post-installation message
+  # Post-installation message and quarantine removal
   postflight do
+    # Remove quarantine attributes from binaries to prevent Gatekeeper issues
+    [
+      "#{HOMEBREW_PREFIX}/bin/aircast",
+      "#{HOMEBREW_PREFIX}/bin/airupnp",
+      "#{HOMEBREW_PREFIX}/bin/airconnect-service"
+    ].each do |binary|
+      if File.exist?(binary)
+        begin
+          system_command "xattr", args: ["-d", "com.apple.quarantine", binary], sudo: false
+        rescue
+          # Ignore errors if attribute doesn't exist
+        end
+      end
+    end
+
     puts <<~EOS
       
       🎉 AirConnect has been successfully installed!
       
       INSTALLED VERSION: #{version}
+      
+      🔒 SECURITY NOTE: 
+      Quarantine attributes have been automatically removed from AirConnect binaries
+      to prevent macOS Gatekeeper issues.
       
       QUICK START:
         brew services start airconnect    # Start the service
@@ -210,6 +229,7 @@ cask "airconnect" do
         ✅ Detailed logging for troubleshooting
         ✅ Unified control of both AirCast and AirUPnP
         ✅ Configuration file support
+        ✅ Automatic Gatekeeper bypass
       
       MANAGEMENT:
         Use 'airconnect help' for detailed usage information
@@ -225,6 +245,9 @@ cask "airconnect" do
         1. Check service status: brew services list | grep airconnect
         2. Run manually: airconnect-service
         3. Check logs: airconnect logs
+        4. Remove quarantine manually: 
+           xattr -d com.apple.quarantine /opt/homebrew/bin/aircast
+           xattr -d com.apple.quarantine /opt/homebrew/bin/airupnp
       
       DOCUMENTATION:
         README: https://github.com/dmego/homebrew-airconnect/blob/main/README.md
