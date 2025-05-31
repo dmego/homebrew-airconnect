@@ -94,10 +94,10 @@ You can also use the individual components directly:
 
 ```bash
 # Start AirCast manually (for Chromecast devices)
-aircast -d all
+aircast -d all=info
 
 # Start AirUPnP manually (for UPnP/Sonos devices)  
-airupnp -d all
+airupnp -d all=info
 ```
 
 ## ⚙️ Configuration
@@ -230,8 +230,8 @@ ping 8.8.8.8
 airconnect diagnostics
 
 # Try manual discovery
-aircast -d all -v
-airupnp -d all -v
+aircast -d all=info -v
+airupnp -d all=info -v
 ```
 
 #### Permission Issues

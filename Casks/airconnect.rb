@@ -221,8 +221,8 @@ cask "airconnect" do
         airconnect config                # Edit configuration
       
       MANUAL USAGE:
-        aircast -d all                   # Start AirCast manually
-        airupnp -d all                   # Start AirUPnP manually
+        aircast -d all=info                   # Start AirCast manually
+        airupnp -d all=info                   # Start AirUPnP manually
       
       FEATURES:
         ✅ Automatic service management with Homebrew services

@@ -94,10 +94,10 @@ airconnect help                   # 显示详细帮助
 
 ```bash
 # 手动启动 AirCast（用于 Chromecast 设备）
-aircast -d all
+aircast -d all=info
 
 # 手动启动 AirUPnP（用于 UPnP/Sonos 设备）
-airupnp -d all
+airupnp -d all=info
 ```
 
 ## ⚙️ 配置
@@ -230,8 +230,8 @@ ping 8.8.8.8
 airconnect diagnostics
 
 # 尝试手动发现
-aircast -d all -v
-airupnp -d all -v
+aircast -d all=info -v
+airupnp -d all=info -v
 ```
 
 #### 权限问题
