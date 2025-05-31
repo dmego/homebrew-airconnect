@@ -54,7 +54,8 @@ log_error() {
 }
 
 log_debug() {
-    [[ "${DEBUG:-0}" == "1" ]] && echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$SERVICE_NAME] DEBUG: $*" | tee -a "$LOG_FILE"
+    # Temporarily enable debug for troubleshooting
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$SERVICE_NAME] DEBUG: $*" | tee -a "$LOG_FILE"
 }
 
 # Check if a process is running by PID
@@ -68,16 +69,32 @@ check_gatekeeper() {
     local binary="$1"
     local binary_name=$(basename "$binary")
     
+    log_debug "Starting Gatekeeper check for $binary_name"
+    
     # Check if file has quarantine attribute
+    log_debug "Checking quarantine attributes for $binary_name"
     if xattr -l "$binary" 2>/dev/null | grep -q "com.apple.quarantine"; then
         log_error "$binary_name is quarantined by macOS Gatekeeper"
         log_error "Run: xattr -d com.apple.quarantine $binary"
         return 1
     fi
+    log_debug "No quarantine attributes found for $binary_name"
     
-    # Try to execute binary with --help to test if it's blocked
-    if ! "$binary" --help >/dev/null 2>&1; then
+    # Try to execute binary with --help to test if it's blocked (with timeout)
+    log_debug "Testing $binary_name execution with --help flag"
+    local temp_output=$(mktemp)
+    local test_pid
+    
+    # Run the test command in background with timeout
+    timeout 5s "$binary" --help >"$temp_output" 2>&1 &
+    test_pid=$!
+    
+    # Wait for the command to complete or timeout
+    if wait $test_pid 2>/dev/null; then
         local exit_code=$?
+        log_debug "$binary_name --help completed with exit code: $exit_code"
+        rm -f "$temp_output"
+        
         if [[ $exit_code -eq 137 ]]; then  # SIGKILL (Killed: 9)
             log_error "$binary_name was killed by macOS Gatekeeper (exit code 137)"
             log_error "This usually means the binary is unsigned or blocked by security settings"
@@ -87,8 +104,12 @@ check_gatekeeper() {
             log_error "3. Reinstall with: brew reinstall airconnect"
             return 1
         fi
+    else
+        log_debug "$binary_name --help test timed out or failed"
+        rm -f "$temp_output"
     fi
     
+    log_debug "Gatekeeper check completed for $binary_name"
     return 0
 }
 
@@ -115,26 +136,39 @@ start_aircast() {
     fi
     
     # Start AirCast in background
+    log "Executing: $AIRCAST_BIN $AIRCAST_ARGS"
     nohup $AIRCAST_BIN $AIRCAST_ARGS > "$AIRCAST_LOG" 2>&1 &
     local pid=$!
     echo "$pid" > "$AIRCAST_PID"
+    log "AirCast started with PID: $pid"
     
-    # Verify startup
-    sleep 2
-    if is_running "$AIRCAST_PID"; then
-        log "AirCast started successfully (PID: $pid)"
-        AIRCAST_RESTART_COUNT=0
-        return 0
-    else
-        log_error "Failed to start AirCast"
-        # Check if it was killed by Gatekeeper
-        if tail -1 "$AIRCAST_LOG" 2>/dev/null | grep -q "Killed"; then
-            log_error "AirCast was killed, possibly by macOS Gatekeeper"
-            check_gatekeeper "$AIRCAST_BIN"
+    # Verify startup with timeout
+    local count=0
+    local max_wait=10
+    while [[ $count -lt $max_wait ]]; do
+        if is_running "$AIRCAST_PID"; then
+            log "AirCast started successfully (PID: $pid)"
+            AIRCAST_RESTART_COUNT=0
+            return 0
         fi
-        rm -f "$AIRCAST_PID"
-        return 1
+        sleep 1
+        ((count++))
+        log_debug "Waiting for AirCast to start... ($count/$max_wait)"
+    done
+    
+    log_error "Failed to start AirCast - timeout after ${max_wait}s"
+    # Check if it was killed by Gatekeeper
+    if tail -1 "$AIRCAST_LOG" 2>/dev/null | grep -q "Killed"; then
+        log_error "AirCast was killed, possibly by macOS Gatekeeper"
+        check_gatekeeper "$AIRCAST_BIN"
     fi
+    # Show last few lines of log for debugging
+    log_error "Last 5 lines of AirCast log:"
+    tail -5 "$AIRCAST_LOG" 2>/dev/null | while read line; do
+        log_error "  $line"
+    done
+    rm -f "$AIRCAST_PID"
+    return 1
 }
 
 # Start AirUPnP service
@@ -160,26 +194,39 @@ start_airupnp() {
     fi
     
     # Start AirUPnP in background
+    log "Executing: $AIRUPNP_BIN $AIRUPNP_ARGS"
     nohup $AIRUPNP_BIN $AIRUPNP_ARGS > "$AIRUPNP_LOG" 2>&1 &
     local pid=$!
     echo "$pid" > "$AIRUPNP_PID"
+    log "AirUPnP started with PID: $pid"
     
-    # Verify startup
-    sleep 2
-    if is_running "$AIRUPNP_PID"; then
-        log "AirUPnP started successfully (PID: $pid)"
-        AIRUPNP_RESTART_COUNT=0
-        return 0
-    else
-        log_error "Failed to start AirUPnP"
-        # Check if it was killed by Gatekeeper
-        if tail -1 "$AIRUPNP_LOG" 2>/dev/null | grep -q "Killed"; then
-            log_error "AirUPnP was killed, possibly by macOS Gatekeeper"
-            check_gatekeeper "$AIRUPNP_BIN"
+    # Verify startup with timeout
+    local count=0
+    local max_wait=10
+    while [[ $count -lt $max_wait ]]; do
+        if is_running "$AIRUPNP_PID"; then
+            log "AirUPnP started successfully (PID: $pid)"
+            AIRUPNP_RESTART_COUNT=0
+            return 0
         fi
-        rm -f "$AIRUPNP_PID"
-        return 1
+        sleep 1
+        ((count++))
+        log_debug "Waiting for AirUPnP to start... ($count/$max_wait)"
+    done
+    
+    log_error "Failed to start AirUPnP - timeout after ${max_wait}s"
+    # Check if it was killed by Gatekeeper
+    if tail -1 "$AIRUPNP_LOG" 2>/dev/null | grep -q "Killed"; then
+        log_error "AirUPnP was killed, possibly by macOS Gatekeeper"
+        check_gatekeeper "$AIRUPNP_BIN"
     fi
+    # Show last few lines of log for debugging
+    log_error "Last 5 lines of AirUPnP log:"
+    tail -5 "$AIRUPNP_LOG" 2>/dev/null | while read line; do
+        log_error "  $line"
+    done
+    rm -f "$AIRUPNP_PID"
+    return 1
 }
 
 # Stop a service gracefully
