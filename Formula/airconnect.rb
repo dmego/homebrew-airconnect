@@ -166,8 +166,8 @@ class Airconnect < Formula
       bin/"airconnect-service"
     ].each do |binary|
       if binary.exist?
-        # Use quiet mode and ignore errors if attribute doesn't exist
-        system "xattr", "-d", "com.apple.quarantine", binary.to_s, err: :close
+        # Use shell redirection to suppress errors
+        system "xattr -d com.apple.quarantine '#{binary}' 2>/dev/null || true"
       end
     end
   end
