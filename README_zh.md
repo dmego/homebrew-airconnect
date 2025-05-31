@@ -22,8 +22,8 @@
 # 添加 tap
 brew tap dmego/airconnect
 
-# 安装 AirConnect
-brew install --cask airconnect
+# 安装 AirConnect（Formula - 推荐用于命令行使用）
+brew install airconnect
 ```
 
 ### 启动服务

@@ -22,8 +22,8 @@ A Homebrew tap for [AirConnect](https://github.com/philippe44/AirConnect) - Use 
 # Add the tap
 brew tap dmego/airconnect
 
-# Install AirConnect
-brew install --cask airconnect
+# Install AirConnect (Formula - recommended for command line usage)
+brew install airconnect
 ```
 
 ### Start the Service

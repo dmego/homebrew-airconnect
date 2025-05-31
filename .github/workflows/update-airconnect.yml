@@ -11,7 +11,7 @@ on:
   
 env:
   UPSTREAM_REPO: philippe44/AirConnect
-  CASK_FILE: Casks/airconnect.rb
+  FORMULA_FILE: Formula/airconnect.rb
 
 jobs:
   check-and-update:
@@ -53,12 +53,12 @@ jobs:
           
           puts "🔍 Latest upstream version: #{latest_version}"
           
-          # Read current version from Cask file
-          cask_content = File.read('${{ env.CASK_FILE }}')
-          current_version_match = cask_content.match(/version\s+"([^"]+)"/)
+          # Read current version from Formula file
+          formula_content = File.read('${{ env.FORMULA_FILE }}')
+          current_version_match = formula_content.match(/version\s+"([^"]+)"/)
           current_version = current_version_match ? current_version_match[1] : nil
           
-          puts "📋 Current Cask version: #{current_version || 'not found'}"
+          puts "📋 Current Formula version: #{current_version || 'not found'}"
           
           # Check if update is needed
           if latest_version != current_version
@@ -120,29 +120,29 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
-    - name: Update Cask file
+    - name: Update Formula file
       if: steps.check_version.outputs.update_needed == 'true'
       run: |
-        echo "🔄 Updating Cask file for version ${{ steps.check_version.outputs.new_version }}"
+        echo "🔄 Updating Formula file for version ${{ steps.check_version.outputs.new_version }}"
         
         # Create backup of original file
-        cp ${{ env.CASK_FILE }} ${{ env.CASK_FILE }}.backup
+        cp ${{ env.FORMULA_FILE }} ${{ env.FORMULA_FILE }}.backup
         
-        # Update version and SHA256 in the Cask file
-        sed -i 's/version "[^"]*"/version "${{ steps.check_version.outputs.new_version }}"/' ${{ env.CASK_FILE }}
-        sed -i 's/sha256 "[^"]*"/sha256 "${{ steps.check_version.outputs.new_sha256 }}"/' ${{ env.CASK_FILE }}
+        # Update version and SHA256 in the Formula file
+        sed -i 's/version "[^"]*"/version "${{ steps.check_version.outputs.new_version }}"/' ${{ env.FORMULA_FILE }}
+        sed -i 's/sha256 "[^"]*"/sha256 "${{ steps.check_version.outputs.new_sha256 }}"/' ${{ env.FORMULA_FILE }}
         
-        echo "✅ Updated ${{ env.CASK_FILE }}"
+        echo "✅ Updated ${{ env.FORMULA_FILE }}"
         
         # Verify the changes
         echo "📋 Verification:"
         echo "Before:"
-        grep -E "(version|sha256)" ${{ env.CASK_FILE }}.backup
+        grep -E "(version|sha256)" ${{ env.FORMULA_FILE }}.backup
         echo "After:"
-        grep -E "(version|sha256)" ${{ env.CASK_FILE }}
+        grep -E "(version|sha256)" ${{ env.FORMULA_FILE }}
         
         # Remove backup file
-        rm ${{ env.CASK_FILE }}.backup
+        rm ${{ env.FORMULA_FILE }}.backup
         
     - name: Update other files
       if: steps.check_version.outputs.update_needed == 'true'
@@ -198,7 +198,7 @@ jobs:
         git config --local user.name "GitHub Action"
         
         # Add only the files we want to commit
-        git add ${{ env.CASK_FILE }}
+        git add ${{ env.FORMULA_FILE }}
         git add scripts/ || true
         git add README.md || true
         git add README_zh.md || true
@@ -249,7 +249,7 @@ jobs:
           ### ✅ Verification
           
           - [x] Downloaded and verified file integrity
-          - [x] Updated version and SHA256 in Cask file
+          - [x] Updated version and SHA256 in Formula file
           - [x] Updated version references in scripts
           - [x] Updated documentation
           - [x] Created changelog entry
