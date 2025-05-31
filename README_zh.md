@@ -118,8 +118,8 @@ airconnect config show
 
 ```bash
 # 服务参数
-AIRCAST_ARGS="-d all -l 1000"
-AIRUPNP_ARGS="-d all -l 1000"
+AIRCAST_ARGS="-d all=info"
+AIRUPNP_ARGS="-d all=info"
 
 # 健康监控
 HEALTH_CHECK_INTERVAL="30"
@@ -134,8 +134,8 @@ DEBUG="0"
 
 | 选项 | 描述 | 默认值 |
 |------|------|--------|
-| `AIRCAST_ARGS` | AirCast 服务参数 | `-d all -l 1000` |
-| `AIRUPNP_ARGS` | AirUPnP 服务参数 | `-d all -l 1000` |
+| `AIRCAST_ARGS` | AirCast 服务参数 | `-d all=info` |
+| `AIRUPNP_ARGS` | AirUPnP 服务参数 | `-d all=info` |
 | `HEALTH_CHECK_INTERVAL` | 健康检查频率（秒） | `30` |
 | `RESTART_DELAY` | 重启前延迟（秒） | `5` |
 | `MAX_RESTART_ATTEMPTS` | 最大重启尝试次数 | `3` |

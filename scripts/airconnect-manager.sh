@@ -235,9 +235,8 @@ PID_DIR="/opt/homebrew/var/run"
 
 # Service arguments
 # -d all: discover all devices
-# -l 1000: latency in milliseconds
-AIRCAST_ARGS="-d all -l 1000"
-AIRUPNP_ARGS="-d all -l 1000"
+AIRCAST_ARGS="-d all=info"
+AIRUPNP_ARGS="-d all=info"
 
 # Health monitoring
 HEALTH_CHECK_INTERVAL="30"  # seconds between health checks

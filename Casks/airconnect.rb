@@ -50,8 +50,8 @@ cask "airconnect" do
             AIRUPNP_BIN="${HOMEBREW_PREFIX}/bin/airupnp"
             
             # Default arguments
-            AIRCAST_ARGS="-d all -l 1000"
-            AIRUPNP_ARGS="-d all -l 1000"
+            AIRCAST_ARGS="-d all=info"
+            AIRUPNP_ARGS="-d all=info"
             
             # Load config if exists
             if [ -f "$HOME/.config/airconnect/airconnect.conf" ]; then
@@ -109,8 +109,8 @@ cask "airconnect" do
                 if [ ! -f "$config_file" ]; then
                   mkdir -p "$(dirname "$config_file")"
                   echo "# AirConnect Configuration" > "$config_file"
-                  echo "AIRCAST_ARGS=\"-d all -l 1000\"" >> "$config_file"
-                  echo "AIRUPNP_ARGS=\"-d all -l 1000\"" >> "$config_file"
+                  echo "AIRCAST_ARGS=\"-d all=info\"" >> "$config_file"
+                  echo "AIRUPNP_ARGS=\"-d all=info\"" >> "$config_file"
                 fi
                 ${EDITOR:-nano} "$config_file"
                 ;;
@@ -133,10 +133,10 @@ cask "airconnect" do
           (support_dir/target).write(<<~CONFIG)
             # AirConnect Configuration
             # Arguments for AirCast (Chromecast support)
-            AIRCAST_ARGS="-d all -l 1000"
+            AIRCAST_ARGS="-d all=info"
             
             # Arguments for AirUPnP (UPnP/Sonos support)
-            AIRUPNP_ARGS="-d all -l 1000"
+            AIRUPNP_ARGS="-d all=info"
             
             # For more options, see:
             # https://github.com/philippe44/AirConnect

@@ -118,8 +118,8 @@ airconnect config show
 
 ```bash
 # Service arguments
-AIRCAST_ARGS="-d all -l 1000"
-AIRUPNP_ARGS="-d all -l 1000"
+AIRCAST_ARGS="-d all=info"
+AIRUPNP_ARGS="-d all=info"
 
 # Health monitoring
 HEALTH_CHECK_INTERVAL="30"
@@ -134,8 +134,8 @@ DEBUG="0"
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `AIRCAST_ARGS` | Arguments for AirCast service | `-d all -l 1000` |
-| `AIRUPNP_ARGS` | Arguments for AirUPnP service | `-d all -l 1000` |
+| `AIRCAST_ARGS` | Arguments for AirCast service | `-d all=info` |
+| `AIRUPNP_ARGS` | Arguments for AirUPnP service | `-d all=info` |
 | `HEALTH_CHECK_INTERVAL` | Health check frequency (seconds) | `30` |
 | `RESTART_DELAY` | Delay before restart (seconds) | `5` |
 | `MAX_RESTART_ATTEMPTS` | Max restart attempts | `3` |
