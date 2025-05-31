@@ -186,23 +186,57 @@ class Airconnect < Formula
   end
 
   def cleanup_on_uninstall
+    ohai "Cleaning up AirConnect files and directories..."
+    
     # Complete cleanup similar to zap functionality
     cleanup_paths = [
+      # Configuration files and directory
       "#{etc}/airconnect",
+      
+      # Data and library files
       "#{var}/lib/airconnect",
+      
+      # Log files
       "#{var}/log/aircast.log",
       "#{var}/log/airupnp.log", 
       "#{var}/log/airconnect-service.log",
+      "#{var}/log/airconnect.log",
+      
+      # PID files
       "#{var}/run/aircast.pid",
       "#{var}/run/airupnp.pid",
       "#{var}/run/airconnect.pid",
+      "#{var}/run/airconnect-service.pid",
+      
+      # LaunchAgent plist file
+      "#{ENV["HOME"]}/Library/LaunchAgents/homebrew.mxcl.airconnect.plist",
+      
+      # User configuration directory (if exists)
+      "#{ENV["HOME"]}/.config/airconnect"
     ]
     
     cleanup_paths.each do |path|
       if File.exist?(path) || Dir.exist?(path)
+        ohai "Removing: #{path}"
         rm_rf path
       end
     end
+    
+    # Clean up any remaining airconnect-related files in log and run directories
+    [var/"log", var/"run"].each do |dir|
+      if dir.exist?
+        Dir.glob("#{dir}/airconnect*").each do |file|
+          ohai "Removing: #{file}"
+          rm_rf file
+        end
+        Dir.glob("#{dir}/air*").each do |file|
+          ohai "Removing: #{file}"
+          rm_rf file
+        end
+      end
+    end
+    
+    ohai "AirConnect cleanup completed!"
   end
 
   def post_install
@@ -372,5 +406,70 @@ class Airconnect < Formula
     # Test that help command works
     output = shell_output("#{bin}/airconnect help")
     assert_match "AirConnect Manager", output
+  end
+
+  # Thorough cleanup for users who want to completely remove all traces
+  def zap
+    ohai "Performing thorough cleanup of all AirConnect files..."
+    
+    # All possible AirConnect-related paths
+    zap_paths = [
+      # Configuration directories
+      "#{etc}/airconnect",
+      "#{ENV["HOME"]}/.config/airconnect",
+      
+      # Data and cache directories
+      "#{var}/lib/airconnect",
+      "#{ENV["HOME"]}/Library/Caches/airconnect",
+      "#{ENV["HOME"]}/Library/Application Support/airconnect",
+      
+      # Log files (all possible locations)
+      "#{var}/log/aircast.log",
+      "#{var}/log/airupnp.log",
+      "#{var}/log/airconnect-service.log",
+      "#{var}/log/airconnect.log",
+      "/var/log/airconnect*.log",
+      "/tmp/airconnect*.log",
+      
+      # PID files (all possible locations)
+      "#{var}/run/aircast.pid",
+      "#{var}/run/airupnp.pid", 
+      "#{var}/run/airconnect.pid",
+      "#{var}/run/airconnect-service.pid",
+      "/var/run/airconnect*.pid",
+      "/tmp/airconnect*.pid",
+      
+      # LaunchAgent and LaunchDaemon files
+      "#{ENV["HOME"]}/Library/LaunchAgents/homebrew.mxcl.airconnect.plist",
+      "#{ENV["HOME"]}/Library/LaunchAgents/airconnect.plist",
+      "/Library/LaunchDaemons/airconnect.plist",
+      "/Library/LaunchAgents/airconnect.plist",
+      
+      # Preferences and settings
+      "#{ENV["HOME"]}/Library/Preferences/airconnect.plist",
+      "#{ENV["HOME"]}/Library/Saved Application State/airconnect.savedState"
+    ]
+    
+    zap_paths.each do |path|
+      # Handle glob patterns
+      if path.include?("*")
+        Dir.glob(path).each do |file|
+          if File.exist?(file) || Dir.exist?(file)
+            ohai "Removing: #{file}"
+            rm_rf file
+          end
+        end
+      else
+        if File.exist?(path) || Dir.exist?(path)
+          ohai "Removing: #{path}"
+          rm_rf path
+        end
+      end
+    end
+    
+    # Clean up any remaining airconnect processes
+    system "pkill -f 'airconnect|aircast|airupnp' 2>/dev/null || true"
+    
+    ohai "Complete AirConnect cleanup finished!"
   end
 end
