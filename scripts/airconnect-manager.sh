@@ -297,17 +297,7 @@ run_diagnostics() {
     else
         echo "  ❌ No internet connectivity"
     fi
-    
-    # Check ports (common AirPlay/UPnP ports)
-    echo ""
-    print_info "Checking network ports..."
-    for port in 5000 7000 49152; do
-        if lsof -i ":$port" >/dev/null 2>&1; then
-            echo "  ⚠️  Port $port is in use"
-        else
-            echo "  ✅ Port $port is available"
-        fi
-    done
+
     
     # Check file permissions
     echo ""
