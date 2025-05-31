@@ -24,7 +24,7 @@ brew tap dmego/airconnect
 
 # 安装 AirConnect（Formula - 推荐用于命令行使用）
 brew install airconnect
-```bash
+```
 
 ### 启动服务
 
@@ -34,7 +34,7 @@ brew services start airconnect
 
 # 检查状态
 airconnect status
-```bash
+```
 
 ## 🎮 使用方法
 
@@ -306,30 +306,19 @@ brew untap dmego/airconnect
 
 ```txt
 homebrew-airconnect/
-├── .github/workflows/          # GitHub Actions
-├── Casks/airconnect.rb        # 主要 cask 定义
-├── scripts/                   # 服务和管理脚本
-└── configs/                   # 配置模板
-```
-
-### 贡献
-
-1. Fork 仓库
-2. 创建功能分支
-3. 进行更改
-4. 充分测试
-5. 提交 pull request
-
-### 测试
-
-```bash
-# 从本地 tap 安装
-brew install --cask ./Casks/airconnect.rb
-
-# 测试服务功能
-brew services start airconnect
-airconnect status
-airconnect logs
+├── .github/workflows/          # GitHub Actions 自动化工作流
+│   └── update-airconnect.yml   # 自动版本更新和发布工作流
+├── Formula/                    # Homebrew Formula 定义
+│   └── airconnect.rb          # AirConnect Formula 主文件
+├── scripts/                   # 辅助脚本集合
+│   ├── airconnect-service.sh  # 后台服务启动和管理脚本
+│   └── airconnect-manager.sh  # 命令行管理工具主脚本
+├── configs/                   # 配置文件模板
+│   └── airconnect.conf        # 默认配置文件模板
+├── CHANGELOG.md               # 版本更新记录和发布说明
+├── LICENSE                    # MIT 开源许可证
+├── README.md                  # 英文项目文档
+└── README_zh.md              # 中文项目文档
 ```
 
 ## 📜 许可证

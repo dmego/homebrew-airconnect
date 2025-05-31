@@ -176,11 +176,14 @@ class Airconnect < Formula
     # Stop the service using launchctl directly since brew command might not be available
     plist_path = "#{ENV["HOME"]}/Library/LaunchAgents/homebrew.mxcl.airconnect.plist"
     if File.exist?(plist_path)
-      system "launchctl", "unload", plist_path, err: :close
+      system "launchctl unload '#{plist_path}' 2>/dev/null || true"
     end
     
     # Also try to stop processes directly
-    system "pkill", "-f", "aircast|airupnp|airconnect", err: :close
+    system "pkill -f 'aircast|airupnp|airconnect' 2>/dev/null || true"
+    
+    # Call cleanup method
+    cleanup_on_uninstall
   end
 
   def cleanup_on_uninstall
