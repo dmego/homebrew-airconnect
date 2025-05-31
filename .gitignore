@@ -1,0 +1,17 @@
+# Temporary files created during GitHub Actions
+.last_version
+check_version.rb
+*.backup
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log

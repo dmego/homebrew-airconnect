@@ -1,33 +1,14 @@
 cask "airconnect" do
   arch arm: "arm64", intel: "x86_64"
 
-  # Use dynamic version fetching to always get the latest
-  version :latest
-  sha256 :no_check
+  version "1.8.3"
+  sha256 "f103595c522b0a4eeca8cb02301a35005d069d4298991ae82e9c312ddb7c8270"
 
-  url do
-    require "open-uri"
-    require "json"
-    
-    begin
-      # Get latest release info from GitHub API
-      api_url = "https://api.github.com/repos/philippe44/AirConnect/releases/latest"
-      response = JSON.parse(URI.open(api_url, "User-Agent" => "Homebrew").read)
-      latest_version = response["tag_name"]
-      
-      "https://github.com/philippe44/AirConnect/releases/download/#{latest_version}/AirConnect-#{latest_version}.zip"
-    rescue => e
-      # Fallback to a known working version if API fails
-      opoo "Failed to fetch latest version (#{e.message}), using fallback"
-      "https://github.com/philippe44/AirConnect/releases/download/1.8.3/AirConnect-1.8.3.zip"
-    end
-  end
-
+  url "https://github.com/philippe44/AirConnect/releases/download/#{version}/AirConnect-#{version}.zip"
   name "AirConnect"
   desc "Use AirPlay to stream to UPnP/Sonos & Chromecast devices"
   homepage "https://github.com/philippe44/AirConnect"
 
-  # This will check for updates automatically
   livecheck do
     url :homepage
     strategy :github_latest
@@ -39,24 +20,6 @@ cask "airconnect" do
 
   # Download and prepare support scripts
   preflight do
-    # Get current version for scripts
-    require "open-uri"
-    require "json"
-    
-    current_version = "latest"
-    begin
-      api_url = "https://api.github.com/repos/philippe44/AirConnect/releases/latest"
-      response = JSON.parse(URI.open(api_url, "User-Agent" => "Homebrew").read)
-      current_version = response["tag_name"]
-      ohai "Installing AirConnect version: #{current_version}"
-    rescue => e
-      opoo "Could not fetch version info: #{e.message}"
-    end
-    
-    # Store version info for scripts
-    version_file = staged_path/"VERSION"
-    version_file.write(current_version)
-    
     support_dir = staged_path/"support"
     support_dir.mkpath
 
@@ -75,7 +38,31 @@ cask "airconnect" do
       rescue => e
         opoo "Could not download #{target}: #{e.message}"
         # Create minimal fallback files if download fails
-        create_fallback_files(support_dir, target)
+        case target
+        when "airconnect-service.sh"
+          (support_dir/target).write(<<~SCRIPT)
+            #!/bin/bash
+            echo "Minimal fallback service script"
+            echo "Please update from: https://github.com/dmego/homebrew-airconnect"
+            exec "${HOMEBREW_PREFIX:-/opt/homebrew}/bin/aircast" -d all &
+            exec "${HOMEBREW_PREFIX:-/opt/homebrew}/bin/airupnp" -d all &
+            wait
+          SCRIPT
+        when "airconnect-manager.sh"
+          (support_dir/target).write(<<~SCRIPT)
+            #!/bin/bash
+            echo "Minimal fallback management script"
+            echo "Please update from: https://github.com/dmego/homebrew-airconnect"
+            echo "Use 'brew services' commands to manage AirConnect"
+          SCRIPT
+        when "airconnect.conf"
+          (support_dir/target).write(<<~CONFIG)
+            # AirConnect Configuration - Fallback Version
+            # Please update from: https://github.com/dmego/homebrew-airconnect
+            AIRCAST_ARGS="-d all -l 1000"
+            AIRUPNP_ARGS="-d all -l 1000"
+          CONFIG
+        end
       end
     end
 
@@ -106,9 +93,8 @@ cask "airconnect" do
     version_dir = Pathname("#{HOMEBREW_PREFIX}/var/lib/airconnect")
     version_dir.mkpath
     
-    if (staged_path/"VERSION").exist?
-      system_command "cp", args: [staged_path/"VERSION", version_dir/"VERSION"]
-    end
+    version_file = version_dir/"VERSION"
+    version_file.write(version)
   end
 
   # Service configuration
@@ -124,15 +110,11 @@ cask "airconnect" do
 
   # Post-installation message
   postflight do
-    # Get installed version for display
-    version_file = Pathname("#{HOMEBREW_PREFIX}/var/lib/airconnect/VERSION")
-    installed_version = version_file.exist? ? version_file.read.strip : "latest"
-    
     puts <<~EOS
       
       🎉 AirConnect has been successfully installed!
       
-      INSTALLED VERSION: #{installed_version}
+      INSTALLED VERSION: #{version}
       
       QUICK START:
         brew services start airconnect    # Start the service
@@ -183,35 +165,4 @@ cask "airconnect" do
     "#{var}/run/airupnp.pid",
     "#{var}/run/airconnect.pid",
   ]
-
-  private
-
-  # Create minimal fallback files if download fails
-  def create_fallback_files(support_dir, filename)
-    case filename
-    when "airconnect-service.sh"
-      (support_dir/filename).write(<<~SCRIPT)
-        #!/bin/bash
-        echo "Minimal fallback service script"
-        echo "Please update from: https://github.com/dmego/homebrew-airconnect"
-        exec "${HOMEBREW_PREFIX:-/opt/homebrew}/bin/aircast" -d all &
-        exec "${HOMEBREW_PREFIX:-/opt/homebrew}/bin/airupnp" -d all &
-        wait
-      SCRIPT
-    when "airconnect-manager.sh"
-      (support_dir/filename).write(<<~SCRIPT)
-        #!/bin/bash
-        echo "Minimal fallback management script"
-        echo "Please update from: https://github.com/dmego/homebrew-airconnect"
-        echo "Use 'brew services' commands to manage AirConnect"
-      SCRIPT
-    when "airconnect.conf"
-      (support_dir/filename).write(<<~CONFIG)
-        # AirConnect Configuration - Fallback Version
-        # Please update from: https://github.com/dmego/homebrew-airconnect
-        AIRCAST_ARGS="-d all -l 1000"
-        AIRUPNP_ARGS="-d all -l 1000"
-      CONFIG
-    end
-  end
 end
