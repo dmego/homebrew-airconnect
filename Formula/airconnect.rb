@@ -167,7 +167,7 @@ class Airconnect < Formula
     ].each do |binary|
       if binary.exist?
         # Use quiet mode and ignore errors if attribute doesn't exist
-        system "xattr", "-d", "com.apple.quarantine", binary.to_s, out: File::NULL, err: File::NULL
+        system "xattr", "-d", "com.apple.quarantine", binary.to_s, err: :close
       end
     end
   end
@@ -176,11 +176,11 @@ class Airconnect < Formula
     # Stop the service using launchctl directly since brew command might not be available
     plist_path = "#{ENV["HOME"]}/Library/LaunchAgents/homebrew.mxcl.airconnect.plist"
     if File.exist?(plist_path)
-      system "launchctl", "unload", plist_path, out: File::NULL, err: File::NULL
+      system "launchctl", "unload", plist_path, err: :close
     end
     
     # Also try to stop processes directly
-    system "pkill", "-f", "aircast|airupnp|airconnect", out: File::NULL, err: File::NULL
+    system "pkill", "-f", "aircast|airupnp|airconnect", err: :close
   end
 
   def cleanup_on_uninstall
