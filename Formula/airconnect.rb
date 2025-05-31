@@ -172,16 +172,33 @@ class Airconnect < Formula
   end
 
   def uninstall
+    ohai "Uninstalling AirConnect..."
+    
     # Stop the service using launchctl directly since brew command might not be available
     plist_path = "#{ENV["HOME"]}/Library/LaunchAgents/homebrew.mxcl.airconnect.plist"
     if File.exist?(plist_path)
+      ohai "Stopping service via launchctl..."
       system "launchctl unload '#{plist_path}' 2>/dev/null || true"
     end
     
     # Also try to stop processes directly
+    ohai "Stopping any running AirConnect processes..."
     system "pkill -f 'aircast|airupnp|airconnect' 2>/dev/null || true"
     
-    # Call cleanup method
+    # Manually clean up configuration files first
+    config_paths = [
+      etc/"airconnect",
+      var/"lib/airconnect"
+    ]
+    
+    config_paths.each do |path|
+      if path.exist?
+        ohai "Removing configuration: #{path}"
+        rm_rf path
+      end
+    end
+    
+    # Call comprehensive cleanup method
     cleanup_on_uninstall
   end
 
