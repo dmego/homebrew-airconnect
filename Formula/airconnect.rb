@@ -187,7 +187,7 @@ class Airconnect < Formula
   end
 
   def cleanup_on_uninstall
-    # Complete cleanup similar to Cask zap functionality
+    # Complete cleanup similar to zap functionality
     cleanup_paths = [
       "#{ENV["HOME"]}/.config/airconnect",
       "#{var}/lib/airconnect",

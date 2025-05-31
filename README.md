@@ -183,7 +183,7 @@ brew services list | grep airconnect
 
 ### Automatic Updates
 
-This tap automatically tracks upstream AirConnect releases. The cask always installs the latest version.
+This tap automatically tracks upstream AirConnect releases.
 
 ### Manual Update Check
 
@@ -192,7 +192,7 @@ This tap automatically tracks upstream AirConnect releases. The cask always inst
 airconnect update-check
 
 # Update to latest version
-brew upgrade --cask airconnect
+brew upgrade airconnect
 ```
 
 ### Update Process
@@ -244,8 +244,8 @@ airconnect diagnostics
 airconnect config reset
 
 # Reinstall if needed
-brew uninstall --cask airconnect
-brew install --cask airconnect
+brew uninstall airconnect
+brew install airconnect
 ```
 
 ### Debug Mode
@@ -279,24 +279,10 @@ airconnect follow
 # Stop services
 brew services stop airconnect
 
-# Uninstall cask
-brew uninstall --cask airconnect
+# Uninstall
+brew uninstall airconnect
 
 # Remove tap (optional)
-brew untap dmego/airconnect
-```
-
-### Complete Cleanup
-
-```bash
-# Stop and uninstall
-brew services stop airconnect
-brew uninstall --cask airconnect
-
-# Remove all data and logs
-brew uninstall --zap --cask airconnect
-
-# Remove tap
 brew untap dmego/airconnect
 ```
 
@@ -306,10 +292,19 @@ brew untap dmego/airconnect
 
 ```txt
 homebrew-airconnect/
-├── .github/workflows/          # GitHub Actions
-├── Casks/airconnect.rb        # Main cask definition
-├── scripts/                   # Service and management scripts
-└── configs/                   # Configuration templates
+├── .github/workflows/          # GitHub Actions automation workflows
+│   └── update-airconnect.yml   # Workflow for automatic version update and release
+├── Formula/                    # Homebrew Formula definitions
+│   └── airconnect.rb           # Main AirConnect Formula file
+├── scripts/                    # Helper scripts
+│   ├── airconnect-service.sh   # Service startup and management script
+│   └── airconnect-manager.sh   # Main CLI management tool script
+├── configs/                    # Configuration file templates
+│   └── airconnect.conf         # Default configuration file template
+├── CHANGELOG.md                # Changelog and release notes
+├── LICENSE                     # MIT open source license
+├── README.md                   # English project documentation
+└── README_zh.md                # Chinese project documentation
 ```
 
 ### Contributing
@@ -324,7 +319,7 @@ homebrew-airconnect/
 
 ```bash
 # Install from local tap
-brew install --cask ./Casks/airconnect.rb
+brew install --formula ./Formula/airconnect.rb
 
 # Test service functionality
 brew services start airconnect

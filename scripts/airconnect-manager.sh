@@ -268,10 +268,10 @@ run_diagnostics() {
         echo "  ✅ Homebrew found: $(brew --version | head -n1)"
         
         # Check if AirConnect is installed
-        if brew list --cask airconnect >/dev/null 2>&1; then
-            echo "  ✅ AirConnect cask installed"
+        if brew list airconnect >/dev/null 2>&1; then
+            echo "  ✅ AirConnect installed"
         else
-            echo "  ❌ AirConnect cask not found"
+            echo "  ❌ AirConnect not found"
         fi
     else
         echo "  ❌ Homebrew not found"

@@ -183,7 +183,7 @@ brew services list | grep airconnect
 
 ### 自动更新
 
-这个 tap 自动跟踪上游 AirConnect 版本。cask 总是安装最新版本。
+这个 tap 自动跟踪上游 AirConnect 版本。
 
 ### 手动检查更新
 
@@ -192,7 +192,7 @@ brew services list | grep airconnect
 airconnect update-check
 
 # 更新到最新版本
-brew upgrade --cask airconnect
+brew upgrade airconnect
 ```
 
 ### 更新流程
@@ -244,8 +244,8 @@ airconnect diagnostics
 airconnect config reset
 
 # 如需要可重新安装
-brew uninstall --cask airconnect
-brew install --cask airconnect
+brew uninstall airconnect
+brew install airconnect
 ```
 
 ### 调试模式
@@ -279,24 +279,10 @@ airconnect follow
 # 停止服务
 brew services stop airconnect
 
-# 卸载 cask
-brew uninstall --cask airconnect
+# 卸载
+brew uninstall airconnect
 
 # 移除 tap（可选）
-brew untap dmego/airconnect
-```
-
-### 完全清理
-
-```bash
-# 停止并卸载
-brew services stop airconnect
-brew uninstall --cask airconnect
-
-# 移除所有数据和日志
-brew uninstall --zap --cask airconnect
-
-# 移除 tap
 brew untap dmego/airconnect
 ```
 
@@ -319,6 +305,25 @@ homebrew-airconnect/
 ├── LICENSE                    # MIT 开源许可证
 ├── README.md                  # 英文项目文档
 └── README_zh.md              # 中文项目文档
+```
+### 贡献指南
+
+1. Fork 本仓库
+2. 创建功能分支
+3. 完成你的更改
+4. 充分测试
+5. 提交 Pull Request
+
+### 测试方法
+
+```bash
+# 从本地 tap 安装
+brew install --formula ./Formula/airconnect.rb
+
+# 测试服务功能
+brew services start airconnect
+airconnect status
+airconnect logs
 ```
 
 ## 📜 许可证
