@@ -42,25 +42,104 @@ cask "airconnect" do
         when "airconnect-service.sh"
           (support_dir/target).write(<<~SCRIPT)
             #!/bin/bash
-            echo "Minimal fallback service script"
-            echo "Please update from: https://github.com/dmego/homebrew-airconnect"
-            exec "${HOMEBREW_PREFIX:-/opt/homebrew}/bin/aircast" -d all &
-            exec "${HOMEBREW_PREFIX:-/opt/homebrew}/bin/airupnp" -d all &
-            wait
+            # AirConnect Service Script
+            set -e
+            
+            HOMEBREW_PREFIX="${HOMEBREW_PREFIX:-/opt/homebrew}"
+            AIRCAST_BIN="${HOMEBREW_PREFIX}/bin/aircast"
+            AIRUPNP_BIN="${HOMEBREW_PREFIX}/bin/airupnp"
+            
+            # Default arguments
+            AIRCAST_ARGS="-d all -l 1000"
+            AIRUPNP_ARGS="-d all -l 1000"
+            
+            # Load config if exists
+            if [ -f "$HOME/.config/airconnect/airconnect.conf" ]; then
+              source "$HOME/.config/airconnect/airconnect.conf"
+            fi
+            
+            echo "Starting AirConnect services..."
+            echo "AirCast: $AIRCAST_BIN $AIRCAST_ARGS"
+            echo "AirUPnP: $AIRUPNP_BIN $AIRUPNP_ARGS"
+            
+            # Start both services
+            exec "$AIRCAST_BIN" $AIRCAST_ARGS &
+            AIRCAST_PID=$!
+            exec "$AIRUPNP_BIN" $AIRUPNP_ARGS &
+            AIRUPNP_PID=$!
+            
+            # Wait for both processes
+            wait $AIRCAST_PID $AIRUPNP_PID
           SCRIPT
         when "airconnect-manager.sh"
           (support_dir/target).write(<<~SCRIPT)
             #!/bin/bash
-            echo "Minimal fallback management script"
-            echo "Please update from: https://github.com/dmego/homebrew-airconnect"
-            echo "Use 'brew services' commands to manage AirConnect"
+            # AirConnect Manager Script
+            
+            HOMEBREW_PREFIX="${HOMEBREW_PREFIX:-/opt/homebrew}"
+            SERVICE_NAME="homebrew.mxcl.airconnect"
+            
+            case "$1" in
+              start)
+                echo "Starting AirConnect service..."
+                brew services start airconnect
+                ;;
+              stop)
+                echo "Stopping AirConnect service..."
+                brew services stop airconnect
+                ;;
+              restart)
+                echo "Restarting AirConnect service..."
+                brew services restart airconnect
+                ;;
+              status)
+                echo "AirConnect service status:"
+                brew services list | grep airconnect || echo "Service not found"
+                ;;
+              logs)
+                echo "AirConnect service logs:"
+                if [ -f "${HOMEBREW_PREFIX}/var/log/airconnect-service.log" ]; then
+                  tail -f "${HOMEBREW_PREFIX}/var/log/airconnect-service.log"
+                else
+                  echo "Log file not found at ${HOMEBREW_PREFIX}/var/log/airconnect-service.log"
+                fi
+                ;;
+              config)
+                config_file="$HOME/.config/airconnect/airconnect.conf"
+                if [ ! -f "$config_file" ]; then
+                  mkdir -p "$(dirname "$config_file")"
+                  echo "# AirConnect Configuration" > "$config_file"
+                  echo "AIRCAST_ARGS=\"-d all -l 1000\"" >> "$config_file"
+                  echo "AIRUPNP_ARGS=\"-d all -l 1000\"" >> "$config_file"
+                fi
+                ${EDITOR:-nano} "$config_file"
+                ;;
+              help|*)
+                echo "AirConnect Manager"
+                echo "Usage: $0 {start|stop|restart|status|logs|config|help}"
+                echo ""
+                echo "Commands:"
+                echo "  start   - Start AirConnect service"
+                echo "  stop    - Stop AirConnect service"
+                echo "  restart - Restart AirConnect service"
+                echo "  status  - Show service status"
+                echo "  logs    - Show service logs"
+                echo "  config  - Edit configuration file"
+                echo "  help    - Show this help message"
+                ;;
+            esac
           SCRIPT
         when "airconnect.conf"
           (support_dir/target).write(<<~CONFIG)
-            # AirConnect Configuration - Fallback Version
-            # Please update from: https://github.com/dmego/homebrew-airconnect
+            # AirConnect Configuration
+            # Arguments for AirCast (Chromecast support)
             AIRCAST_ARGS="-d all -l 1000"
+            
+            # Arguments for AirUPnP (UPnP/Sonos support)
             AIRUPNP_ARGS="-d all -l 1000"
+            
+            # For more options, see:
+            # https://github.com/philippe44/AirConnect
           CONFIG
         end
       end
@@ -97,10 +176,10 @@ cask "airconnect" do
     version_file.write(version)
   end
 
-  # Service configuration
+  # Service configuration for Homebrew services
   service do
     name "homebrew.mxcl.airconnect"
-    run [opt_bin/"airconnect-service"]
+    run opt_bin/"airconnect-service"
     keep_alive true
     log_path "#{HOMEBREW_PREFIX}/var/log/airconnect-service.log"
     error_log_path "#{HOMEBREW_PREFIX}/var/log/airconnect-service.log"
@@ -122,12 +201,15 @@ cask "airconnect" do
         airconnect logs                  # View logs
         airconnect config                # Edit configuration
       
+      MANUAL USAGE:
+        aircast -d all                   # Start AirCast manually
+        airupnp -d all                   # Start AirUPnP manually
+      
       FEATURES:
-        ✅ Automatic service management and health monitoring
+        ✅ Automatic service management with Homebrew services
         ✅ Detailed logging for troubleshooting
         ✅ Unified control of both AirCast and AirUPnP
-        ✅ Graceful shutdown and restart capabilities
-        ✅ Auto-update support with version tracking
+        ✅ Configuration file support
       
       MANAGEMENT:
         Use 'airconnect help' for detailed usage information
@@ -138,9 +220,11 @@ cask "airconnect" do
         🎵 AirCast  - Streams to Chromecast devices
         🔊 AirUPnP  - Streams to UPnP/Sonos devices
       
-      UPDATE CHECKING:
-        airconnect update-check          # Check for updates
-        brew upgrade --cask airconnect   # Update to latest version
+      TROUBLESHOOTING:
+        If 'brew services start airconnect' fails, try:
+        1. Check service status: brew services list | grep airconnect
+        2. Run manually: airconnect-service
+        3. Check logs: airconnect logs
       
       DOCUMENTATION:
         README: https://github.com/dmego/homebrew-airconnect/blob/main/README.md
