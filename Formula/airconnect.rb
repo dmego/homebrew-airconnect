@@ -188,25 +188,30 @@ class Airconnect < Formula
   def cleanup_on_uninstall
     ohai "Cleaning up AirConnect files and directories..."
     
+    # Get proper paths
+    homebrew_prefix = ENV["HOMEBREW_PREFIX"] || HOMEBREW_PREFIX
+    etc_dir = "#{homebrew_prefix}/etc"
+    var_dir = "#{homebrew_prefix}/var"
+    
     # Complete cleanup similar to zap functionality
     cleanup_paths = [
       # Configuration files and directory
-      "#{etc}/airconnect",
+      "#{etc_dir}/airconnect",
       
       # Data and library files
-      "#{var}/lib/airconnect",
+      "#{var_dir}/lib/airconnect",
       
       # Log files
-      "#{var}/log/aircast.log",
-      "#{var}/log/airupnp.log", 
-      "#{var}/log/airconnect-service.log",
-      "#{var}/log/airconnect.log",
+      "#{var_dir}/log/aircast.log",
+      "#{var_dir}/log/airupnp.log", 
+      "#{var_dir}/log/airconnect-service.log",
+      "#{var_dir}/log/airconnect.log",
       
       # PID files
-      "#{var}/run/aircast.pid",
-      "#{var}/run/airupnp.pid",
-      "#{var}/run/airconnect.pid",
-      "#{var}/run/airconnect-service.pid",
+      "#{var_dir}/run/aircast.pid",
+      "#{var_dir}/run/airupnp.pid",
+      "#{var_dir}/run/airconnect.pid",
+      "#{var_dir}/run/airconnect-service.pid",
       
       # LaunchAgent plist file
       "#{ENV["HOME"]}/Library/LaunchAgents/homebrew.mxcl.airconnect.plist",
@@ -219,19 +224,25 @@ class Airconnect < Formula
       if File.exist?(path) || Dir.exist?(path)
         ohai "Removing: #{path}"
         rm_rf path
+      else
+        ohai "Not found (skipping): #{path}"
       end
     end
     
     # Clean up any remaining airconnect-related files in log and run directories
-    [var/"log", var/"run"].each do |dir|
-      if dir.exist?
+    ["#{var_dir}/log", "#{var_dir}/run"].each do |dir|
+      if Dir.exist?(dir)
         Dir.glob("#{dir}/airconnect*").each do |file|
-          ohai "Removing: #{file}"
-          rm_rf file
+          if File.exist?(file)
+            ohai "Removing: #{file}"
+            rm_rf file
+          end
         end
         Dir.glob("#{dir}/air*").each do |file|
-          ohai "Removing: #{file}"
-          rm_rf file
+          if File.exist?(file)
+            ohai "Removing: #{file}"
+            rm_rf file
+          end
         end
       end
     end
@@ -412,30 +423,35 @@ class Airconnect < Formula
   def zap
     ohai "Performing thorough cleanup of all AirConnect files..."
     
+    # Get proper paths
+    homebrew_prefix = ENV["HOMEBREW_PREFIX"] || HOMEBREW_PREFIX
+    etc_dir = "#{homebrew_prefix}/etc"
+    var_dir = "#{homebrew_prefix}/var"
+    
     # All possible AirConnect-related paths
     zap_paths = [
       # Configuration directories
-      "#{etc}/airconnect",
+      "#{etc_dir}/airconnect",
       "#{ENV["HOME"]}/.config/airconnect",
       
       # Data and cache directories
-      "#{var}/lib/airconnect",
+      "#{var_dir}/lib/airconnect",
       "#{ENV["HOME"]}/Library/Caches/airconnect",
       "#{ENV["HOME"]}/Library/Application Support/airconnect",
       
       # Log files (all possible locations)
-      "#{var}/log/aircast.log",
-      "#{var}/log/airupnp.log",
-      "#{var}/log/airconnect-service.log",
-      "#{var}/log/airconnect.log",
+      "#{var_dir}/log/aircast.log",
+      "#{var_dir}/log/airupnp.log",
+      "#{var_dir}/log/airconnect-service.log",
+      "#{var_dir}/log/airconnect.log",
       "/var/log/airconnect*.log",
       "/tmp/airconnect*.log",
       
       # PID files (all possible locations)
-      "#{var}/run/aircast.pid",
-      "#{var}/run/airupnp.pid", 
-      "#{var}/run/airconnect.pid",
-      "#{var}/run/airconnect-service.pid",
+      "#{var_dir}/run/aircast.pid",
+      "#{var_dir}/run/airupnp.pid", 
+      "#{var_dir}/run/airconnect.pid",
+      "#{var_dir}/run/airconnect-service.pid",
       "/var/run/airconnect*.pid",
       "/tmp/airconnect*.pid",
       
