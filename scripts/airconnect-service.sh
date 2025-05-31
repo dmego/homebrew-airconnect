@@ -8,12 +8,13 @@
 
 set -euo pipefail
 
-# Source configuration if available
-CONFIG_FILE="${HOME}/.config/airconnect/airconnect.conf"
-[[ -f "$CONFIG_FILE" ]] && source "$CONFIG_FILE"
-
 # Default configuration
 HOMEBREW_PREFIX="${HOMEBREW_PREFIX:-/opt/homebrew}"
+
+# Source configuration if available
+CONFIG_FILE="$HOMEBREW_PREFIX/etc/airconnect/airconnect.conf"
+[[ -f "$CONFIG_FILE" ]] && source "$CONFIG_FILE"
+
 AIRCAST_BIN="${AIRCAST_BIN:-$HOMEBREW_PREFIX/bin/aircast}"
 AIRUPNP_BIN="${AIRUPNP_BIN:-$HOMEBREW_PREFIX/bin/airupnp}"
 LOG_DIR="${LOG_DIR:-$HOMEBREW_PREFIX/var/log}"

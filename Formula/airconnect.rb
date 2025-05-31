@@ -56,8 +56,8 @@ class Airconnect < Formula
             AIRUPNP_ARGS="-d all=info"
             
             # Load config if exists
-            if [ -f "$HOME/.config/airconnect/airconnect.conf" ]; then
-              source "$HOME/.config/airconnect/airconnect.conf"
+            if [ -f "#{etc}/airconnect/airconnect.conf" ]; then
+              source "#{etc}/airconnect/airconnect.conf"
             fi
             
             echo "Starting AirConnect services..."
@@ -107,7 +107,7 @@ class Airconnect < Formula
                 fi
                 ;;
               config)
-                config_file="$HOME/.config/airconnect/airconnect.conf"
+                config_file="#{etc}/airconnect/airconnect.conf"
                 if [ ! -f "$config_file" ]; then
                   mkdir -p "$(dirname "$config_file")"
                   echo "# AirConnect Configuration" > "$config_file"
@@ -188,7 +188,7 @@ class Airconnect < Formula
   def cleanup_on_uninstall
     # Complete cleanup similar to zap functionality
     cleanup_paths = [
-      "#{ENV["HOME"]}/.config/airconnect",
+      "#{etc}/airconnect",
       "#{var}/lib/airconnect",
       "#{var}/log/aircast.log",
       "#{var}/log/airupnp.log", 
@@ -206,53 +206,70 @@ class Airconnect < Formula
   end
 
   def post_install
-    ohai "Configuring AirConnect..."
+    ohai "AirConnect installation completed!"
     
-    # Use system commands which are more reliable in Homebrew context
-    home = ENV["HOME"]
-    config_dir = "#{home}/.config/airconnect"
-    user_config = "#{config_dir}/airconnect.conf"
-    
-    # Create config directory using system command
-    system "mkdir", "-p", config_dir
-    
-    if File.exist?(user_config)
-      ohai "Configuration file already exists at #{user_config}"
-    else
-      # Try to copy from template first
-      homebrew_prefix = ENV["HOMEBREW_PREFIX"] || HOMEBREW_PREFIX
-      template_config = "#{homebrew_prefix}/var/lib/airconnect/airconnect.conf.default"
+    # Create configuration file in Homebrew's etc directory
+    begin
+      config_dir = etc/"airconnect"
+      config_file = config_dir/"airconnect.conf"
+      template_file = var/"lib/airconnect/airconnect.conf.default"
       
-      if File.exist?(template_config)
-        system "cp", template_config, user_config
-        ohai "Configuration file created from template"
+      ohai "Creating configuration directory at #{config_dir}"
+      config_dir.mkpath
+      
+      # Copy template to config if template exists
+      if template_file.exist?
+        ohai "Copying configuration template to #{config_file}"
+        config_file.write(template_file.read)
       else
-        # Create basic config using system echo
-        basic_config = <<~CONFIG
-          # AirConnect Configuration
-          # Arguments for AirCast (Chromecast support)
-          AIRCAST_ARGS="-d all=info"
+        # Create default config directly
+        ohai "Creating default configuration at #{config_file}"
+        config_file.write(<<~CONFIG)
+          # AirConnect Configuration File
+          # Edit this file to customize AirConnect behavior
           
-          # Arguments for AirUPnP (UPnP/Sonos support)
+          # Service binaries (usually don't need to change these)
+          AIRCAST_BIN="#{bin}/aircast"
+          AIRUPNP_BIN="#{bin}/airupnp"
+          
+          # Log and PID directories
+          LOG_DIR="#{var}/log"
+          PID_DIR="#{var}/run"
+          
+          # Service arguments
+          # -d all: discover all devices
+          AIRCAST_ARGS="-d all=info"
           AIRUPNP_ARGS="-d all=info"
           
-          # For more options, see:
-          # https://github.com/philippe44/AirConnect
+          # Health monitoring
+          HEALTH_CHECK_INTERVAL="30"  # seconds between health checks
+          RESTART_DELAY="5"           # seconds to wait before restart
+          MAX_RESTART_ATTEMPTS="3"    # max restart attempts before giving up
+          
+          # Debug mode (1 to enable, 0 to disable)
+          DEBUG="0"
+          
+          # Custom device exclusions (comma-separated)
+          # EXCLUDED_DEVICES="device1,device2"
+          
+          # Network interface (leave empty for auto-detection)
+          # NETWORK_INTERFACE="en0"
         CONFIG
-        
-        File.write(user_config, basic_config)
-        ohai "Basic configuration file created"
       end
       
-      # Set permissions
-      system "chmod", "644", user_config
+      # Ensure proper permissions
+      config_file.chmod(0644)
+      ohai "Configuration file created successfully at #{config_file}"
+      
+    rescue => e
+      opoo "Could not create configuration file: #{e.message}"
+      ohai "Configuration will be created when you first run 'airconnect config'"
     end
     
     # Create version file more safely
     begin
-      homebrew_prefix = ENV["HOMEBREW_PREFIX"] || HOMEBREW_PREFIX
-      version_file = "#{homebrew_prefix}/var/lib/airconnect/VERSION"
-      File.write(version_file, version.to_s)
+      version_file = var/"lib/airconnect/VERSION"
+      version_file.write(version.to_s)
     rescue
       # Ignore version file creation errors
     end
@@ -286,7 +303,7 @@ class Airconnect < Formula
       
       MANAGEMENT:
         Use 'airconnect help' for detailed usage information
-        Config file: ~/.config/airconnect/airconnect.conf
+        Config file: #{etc}/airconnect/airconnect.conf
         Log files: #{ENV["HOMEBREW_PREFIX"] || HOMEBREW_PREFIX}/var/log/
       
       SERVICES:
@@ -328,7 +345,7 @@ class Airconnect < Formula
         airconnect-service
       
       Configuration file is located at:
-        ~/.config/airconnect/airconnect.conf
+        #{etc}/airconnect/airconnect.conf
       
       Log files are located at:
         #{var}/log/airconnect-service.log

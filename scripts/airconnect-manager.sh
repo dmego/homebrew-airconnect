@@ -10,7 +10,7 @@ set -euo pipefail
 
 # Configuration
 HOMEBREW_PREFIX="${HOMEBREW_PREFIX:-/opt/homebrew}"
-CONFIG_DIR="${HOME}/.config/airconnect"
+CONFIG_DIR="$HOMEBREW_PREFIX/etc/airconnect"
 CONFIG_FILE="$CONFIG_DIR/airconnect.conf"
 LOG_DIR="$HOMEBREW_PREFIX/var/log"
 PID_DIR="$HOMEBREW_PREFIX/var/run"
