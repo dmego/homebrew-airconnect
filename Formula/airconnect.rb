@@ -166,29 +166,21 @@ class Airconnect < Formula
       bin/"airconnect-service"
     ].each do |binary|
       if binary.exist?
-        begin
-          system "xattr", "-d", "com.apple.quarantine", binary
-        rescue
-          # Ignore errors if attribute doesn't exist
-        end
+        # Use quiet mode and ignore errors if attribute doesn't exist
+        system "xattr", "-d", "com.apple.quarantine", binary, [:out, :err] => File::NULL
       end
     end
   end
 
   def uninstall
     # Stop the service using launchctl directly since brew command might not be available
-    begin
-      system "launchctl", "unload", "#{ENV["HOME"]}/Library/LaunchAgents/homebrew.mxcl.airconnect.plist"
-    rescue
-      # Ignore errors during cleanup
+    plist_path = "#{ENV["HOME"]}/Library/LaunchAgents/homebrew.mxcl.airconnect.plist"
+    if File.exist?(plist_path)
+      system "launchctl", "unload", plist_path, [:out, :err] => File::NULL
     end
     
     # Also try to stop processes directly
-    begin
-      system "pkill", "-f", "aircast|airupnp|airconnect"
-    rescue
-      # Ignore errors during cleanup
-    end
+    system "pkill", "-f", "aircast|airupnp|airconnect", [:out, :err] => File::NULL
   end
 
   def cleanup_on_uninstall
@@ -205,10 +197,8 @@ class Airconnect < Formula
     ]
     
     cleanup_paths.each do |path|
-      begin
-        rm_rf path if File.exist?(path) || Dir.exist?(path)
-      rescue
-        # Ignore errors during cleanup
+      if File.exist?(path) || Dir.exist?(path)
+        rm_rf path
       end
     end
   end
@@ -280,7 +270,6 @@ class Airconnect < Formula
   end
 
   service do
-    name "homebrew.mxcl.airconnect"
     run opt_bin/"airconnect-service"
     keep_alive true
     log_path var/"log/airconnect-service.log"
