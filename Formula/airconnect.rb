@@ -207,94 +207,17 @@ class Airconnect < Formula
 
   def post_install
     # Create user config directory and copy default config if needed
-    begin
-      home_dir = ENV["HOME"]
-      ohai "🏠 Home directory: #{home_dir}"
-      
-      config_dir = Pathname.new(home_dir) / ".config" / "airconnect"
-      ohai "📁 Target config directory: #{config_dir}"
-      
-      # Check if directory exists before creating
-      if config_dir.exist?
-        ohai "✅ Config directory already exists"
-      else
-        ohai "📂 Creating config directory..."
-        config_dir.mkpath
-        if config_dir.exist?
-          ohai "✅ Config directory created successfully"
-        else
-          onoe "❌ Failed to create config directory"
-        end
-      end
-      
-      user_config = config_dir / "airconnect.conf"
-      default_config = var / "lib" / "airconnect" / "airconnect.conf.default"
-      
-      ohai "🎯 Target config file: #{user_config}"
-      ohai "📋 Source template file: #{default_config}"
-      
-      # Check if source template exists
-      if default_config.exist?
-        ohai "✅ Source template file exists"
-      else
-        onoe "❌ Source template file not found!"
-        ohai "📝 Creating fallback configuration..."
-        
-        # Create a basic config directly
-        user_config.write(<<~CONFIG)
-          # AirConnect Configuration
-          # Arguments for AirCast (Chromecast support)
-          AIRCAST_ARGS="-d all=info"
-          
-          # Arguments for AirUPnP (UPnP/Sonos support)
-          AIRUPNP_ARGS="-d all=info"
-          
-          # For more options, see:
-          # https://github.com/philippe44/AirConnect
-        CONFIG
-        ohai "✅ Fallback configuration created"
-      end
-      
-      # Copy config file if it doesn't exist
-      if user_config.exist?
-        ohai "✅ User config file already exists"
-      else
-        if default_config.exist?
-          ohai "📋 Copying template to user config..."
-          cp default_config, user_config
-          if user_config.exist?
-            ohai "✅ User config file created successfully"
-            user_config.chmod(0644)
-            ohai "🔐 Set config file permissions to 644"
-          else
-            onoe "❌ Failed to copy config file"
-          end
-        end
-      end
-      
-      # Final verification
-      if user_config.exist?
-        file_size = user_config.size
-        ohai "✅ Final verification: Config file exists (#{file_size} bytes)"
-      else
-        onoe "❌ Final verification failed: Config file does not exist"
-      end
-      
-    rescue => e
-      onoe "💥 Error in post_install config setup: #{e.message}"
-      ohai "🔍 Error class: #{e.class}"
-      ohai "📍 Error backtrace: #{e.backtrace&.first}"
+    config_dir = Pathname.new(ENV["HOME"])/"/.config/airconnect"
+    config_dir.mkpath
+    
+    user_config = config_dir/"airconnect.conf"
+    unless user_config.exist?
+      cp var/"lib/airconnect/airconnect.conf.default", user_config
     end
 
     # Create version info file
-    begin
-      version_file = var / "lib" / "airconnect" / "VERSION"
-      ohai "📝 Creating version file: #{version_file}"
-      version_file.write version.to_s
-      ohai "✅ Version file created: #{version}"
-    rescue => e
-      onoe "💥 Error creating version file: #{e.message}"
-    end
+    version_file = var/"lib/airconnect/VERSION"
+    version_file.write version.to_s
 
     puts <<~EOS
       
