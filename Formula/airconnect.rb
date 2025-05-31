@@ -206,18 +206,56 @@ class Airconnect < Formula
   end
 
   def post_install
-    # Create user config directory and copy default config if needed
-    config_dir = Pathname.new(ENV["HOME"])/"/.config/airconnect"
-    config_dir.mkpath
+    ohai "Configuring AirConnect..."
     
-    user_config = config_dir/"airconnect.conf"
-    unless user_config.exist?
-      cp var/"lib/airconnect/airconnect.conf.default", user_config
+    # Use system commands which are more reliable in Homebrew context
+    home = ENV["HOME"]
+    config_dir = "#{home}/.config/airconnect"
+    user_config = "#{config_dir}/airconnect.conf"
+    
+    # Create config directory using system command
+    system "mkdir", "-p", config_dir
+    
+    if File.exist?(user_config)
+      ohai "Configuration file already exists at #{user_config}"
+    else
+      # Try to copy from template first
+      homebrew_prefix = ENV["HOMEBREW_PREFIX"] || HOMEBREW_PREFIX
+      template_config = "#{homebrew_prefix}/var/lib/airconnect/airconnect.conf.default"
+      
+      if File.exist?(template_config)
+        system "cp", template_config, user_config
+        ohai "Configuration file created from template"
+      else
+        # Create basic config using system echo
+        basic_config = <<~CONFIG
+          # AirConnect Configuration
+          # Arguments for AirCast (Chromecast support)
+          AIRCAST_ARGS="-d all=info"
+          
+          # Arguments for AirUPnP (UPnP/Sonos support)
+          AIRUPNP_ARGS="-d all=info"
+          
+          # For more options, see:
+          # https://github.com/philippe44/AirConnect
+        CONFIG
+        
+        File.write(user_config, basic_config)
+        ohai "Basic configuration file created"
+      end
+      
+      # Set permissions
+      system "chmod", "644", user_config
     end
-
-    # Create version info file
-    version_file = var/"lib/airconnect/VERSION"
-    version_file.write version.to_s
+    
+    # Create version file more safely
+    begin
+      homebrew_prefix = ENV["HOMEBREW_PREFIX"] || HOMEBREW_PREFIX
+      version_file = "#{homebrew_prefix}/var/lib/airconnect/VERSION"
+      File.write(version_file, version.to_s)
+    rescue
+      # Ignore version file creation errors
+    end
 
     puts <<~EOS
       
@@ -249,7 +287,7 @@ class Airconnect < Formula
       MANAGEMENT:
         Use 'airconnect help' for detailed usage information
         Config file: ~/.config/airconnect/airconnect.conf
-        Log files: #{var}/log/
+        Log files: #{ENV["HOMEBREW_PREFIX"] || HOMEBREW_PREFIX}/var/log/
       
       SERVICES:
         🎵 AirCast  - Streams to Chromecast devices
