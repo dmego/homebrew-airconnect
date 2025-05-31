@@ -437,7 +437,7 @@ class Airconnect < Formula
   end
 
   # Thorough cleanup for users who want to completely remove all traces
-  def zap
+  zap do
     ohai "Performing thorough cleanup of all AirConnect files..."
     
     # Get proper paths
