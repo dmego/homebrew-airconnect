@@ -2,6 +2,8 @@
 
 A Homebrew tap for [AirConnect](https://github.com/philippe44/AirConnect) - Use AirPlay to stream to UPnP/Sonos & Chromecast devices.
 
+**Languages**: [English](README.md) | [中文](README_zh.md)
+
 [![Update AirConnect Version](https://github.com/dmego/homebrew-airconnect/actions/workflows/update-airconnect.yml/badge.svg)](https://github.com/dmego/homebrew-airconnect/actions/workflows/update-airconnect.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
