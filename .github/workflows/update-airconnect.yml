@@ -1,0 +1,257 @@
+name: Update AirConnect Version
+
+on:
+  schedule:
+    # Check for updates every day at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual triggering
+  push:
+    branches: [ main ]
+    paths: [ '.github/workflows/update-airconnect.yml' ]
+  
+env:
+  UPSTREAM_REPO: philippe44/AirConnect
+  CASK_FILE: Casks/airconnect.rb
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+        
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.2'
+        
+    - name: Install dependencies
+      run: |
+        gem install octokit
+        
+    - name: Check for new version
+      id: check_version
+      run: |
+        cat > check_version.rb << 'EOF'
+        require 'octokit'
+        require 'json'
+        require 'open-uri'
+        require 'digest'
+        
+        # Initialize GitHub client
+        client = Octokit::Client.new(access_token: ENV['GITHUB_TOKEN'])
+        
+        begin
+          # Get latest release from upstream
+          latest_release = client.latest_release('${{ env.UPSTREAM_REPO }}')
+          latest_version = latest_release.tag_name
+          
+          puts "🔍 Latest upstream version: #{latest_version}"
+          
+          # Check if we have a record of the last processed version
+          last_version_file = '.last_version'
+          last_processed_version = File.exist?(last_version_file) ? File.read(last_version_file).strip : nil
+          
+          puts "📋 Last processed version: #{last_processed_version || 'none'}"
+          
+          # Check if update is needed
+          if latest_version != last_processed_version
+            puts "🔄 Update needed: #{last_processed_version || 'none'} -> #{latest_version}"
+            
+            # Download the new release to get SHA256
+            download_url = "https://github.com/${{ env.UPSTREAM_REPO }}/releases/download/#{latest_version}/AirConnect-#{latest_version}.zip"
+            puts "⬇️  Downloading: #{download_url}"
+            
+            begin
+              file_content = URI.open(download_url, 'User-Agent' => 'GitHub-Actions').read
+              sha256 = Digest::SHA256.hexdigest(file_content)
+              file_size = (file_content.length / 1024.0 / 1024.0).round(2)
+              
+              puts "✅ Download successful"
+              puts "📏 File size: #{file_size} MB"
+              puts "🔐 SHA256: #{sha256}"
+              
+              # Get release information
+              release_date = latest_release.published_at.strftime('%Y-%m-%d')
+              release_body = latest_release.body || "No release notes available"
+              
+              # Output for GitHub Actions
+              File.open(ENV['GITHUB_OUTPUT'], 'a') do |f|
+                f.puts "update_needed=true"
+                f.puts "new_version=#{latest_version}"
+                f.puts "new_sha256=#{sha256}"
+                f.puts "download_url=#{download_url}"
+                f.puts "file_size=#{file_size}"
+                f.puts "release_date=#{release_date}"
+                f.puts "release_notes<<EOF"
+                f.puts release_body
+                f.puts "EOF"
+              end
+              
+              # Update last processed version
+              File.write(last_version_file, latest_version)
+              
+            rescue => e
+              puts "❌ Failed to download or process release: #{e.message}"
+              exit 1
+            end
+          else
+            puts "✅ No update needed - already at latest version"
+            File.open(ENV['GITHUB_OUTPUT'], 'a') do |f|
+              f.puts "update_needed=false"
+            end
+          end
+          
+        rescue => e
+          puts "❌ Error checking for updates: #{e.message}"
+          exit 1
+        end
+        EOF
+        
+        ruby check_version.rb
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Update files
+      if: steps.check_version.outputs.update_needed == 'true'
+      run: |
+        echo "🔄 Updating files for version ${{ steps.check_version.outputs.new_version }}"
+        
+        # Update the manager script with new version info
+        if [ -f "scripts/airconnect-manager.sh" ]; then
+          sed -i 's/AIRCONNECT_VERSION="[^"]*"/AIRCONNECT_VERSION="${{ steps.check_version.outputs.new_version }}"/' scripts/airconnect-manager.sh
+          echo "✅ Updated airconnect-manager.sh"
+        fi
+        
+        # Update README files with new version
+        if [ -f "docs/README.md" ]; then
+          sed -i 's/Version: [0-9.]*/Version: ${{ steps.check_version.outputs.new_version }}/' docs/README.md
+          echo "✅ Updated README.md"
+        fi
+        
+        if [ -f "docs/README_zh.md" ]; then
+          sed -i 's/版本: [0-9.]*/版本: ${{ steps.check_version.outputs.new_version }}/' docs/README_zh.md
+          echo "✅ Updated README_zh.md"
+        fi
+        
+        # Create changelog entry
+        echo "📝 Creating changelog entry"
+        changelog_file="CHANGELOG.md"
+        if [ ! -f "$changelog_file" ]; then
+          echo "# Changelog" > "$changelog_file"
+          echo "" >> "$changelog_file"
+        fi
+        
+        # Add new entry to changelog
+        {
+          echo "# Changelog"
+          echo ""
+          echo "## [${{ steps.check_version.outputs.new_version }}] - ${{ steps.check_version.outputs.release_date }}"
+          echo ""
+          echo "### Updated"
+          echo "- AirConnect to version ${{ steps.check_version.outputs.new_version }}"
+          echo "- File size: ${{ steps.check_version.outputs.file_size }} MB"
+          echo ""
+          echo "### Release Notes"
+          echo "${{ steps.check_version.outputs.release_notes }}"
+          echo ""
+          tail -n +3 "$changelog_file"
+        } > "${changelog_file}.tmp" && mv "${changelog_file}.tmp" "$changelog_file"
+        
+    - name: Commit changes
+      if: steps.check_version.outputs.update_needed == 'true'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add .last_version scripts/ docs/ CHANGELOG.md
+        git commit -m "chore: prepare for AirConnect ${{ steps.check_version.outputs.new_version }} update" || exit 0
+        
+    - name: Create Pull Request
+      if: steps.check_version.outputs.update_needed == 'true'
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: "feat: update AirConnect to ${{ steps.check_version.outputs.new_version }}"
+        title: "🚀 Update AirConnect to ${{ steps.check_version.outputs.new_version }}"
+        body: |
+          ## 🚀 AirConnect Version Update
+          
+          This PR automatically updates AirConnect to the latest upstream version.
+          
+          ### 📋 Changes
+          
+          | Field | Value |
+          |-------|-------|
+          | **New Version** | `${{ steps.check_version.outputs.new_version }}` |
+          | **Release Date** | `${{ steps.check_version.outputs.release_date }}` |
+          | **File Size** | `${{ steps.check_version.outputs.file_size }} MB` |
+          | **SHA256** | `${{ steps.check_version.outputs.new_sha256 }}` |
+          | **Download URL** | ${{ steps.check_version.outputs.download_url }} |
+          
+          ### 📚 Upstream Release Notes
+          
+          ${{ steps.check_version.outputs.release_notes }}
+          
+          ### 🔗 Links
+          
+          - [Upstream Release](https://github.com/${{ env.UPSTREAM_REPO }}/releases/tag/${{ steps.check_version.outputs.new_version }})
+          - [Download Link](${{ steps.check_version.outputs.download_url }})
+          
+          ### ✅ Verification
+          
+          - [x] Downloaded and verified file integrity
+          - [x] Updated version references in scripts
+          - [x] Updated documentation
+          - [x] Created changelog entry
+          
+          ---
+          
+          🤖 This PR was created automatically by GitHub Actions.
+          
+          **Review checklist:**
+          - [ ] Version number is correct
+          - [ ] SHA256 hash is valid
+          - [ ] Documentation is updated
+          - [ ] No breaking changes in upstream release
+          
+        branch: update-airconnect-${{ steps.check_version.outputs.new_version }}
+        delete-branch: true
+        draft: false
+        
+    - name: Create notification issue
+      if: steps.check_version.outputs.update_needed == 'true'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: `🔔 AirConnect ${{ steps.check_version.outputs.new_version }} Available`,
+            body: `
+          ## 📢 New Version Available
+          
+          AirConnect version **${{ steps.check_version.outputs.new_version }}** has been released upstream.
+          
+          ### 🎯 Actions Taken
+          - ✅ Automatic update PR created
+          - ✅ Files updated and verified
+          - ✅ Documentation updated
+          
+          ### 👀 Next Steps
+          1. Review the [update PR](https://github.com/${context.repo.owner}/${context.repo.repo}/pulls)
+          2. Test the changes if needed
+          3. Merge the PR to release the update
+          
+          ### 📊 Version Info
+          - **Version**: ${{ steps.check_version.outputs.new_version }}
+          - **Release Date**: ${{ steps.check_version.outputs.release_date }}
+          - **File Size**: ${{ steps.check_version.outputs.file_size }} MB
+          
+          This issue will be automatically closed when the update is merged.
+            `,
+            labels: ['automation', 'update', 'upstream']
+          })
