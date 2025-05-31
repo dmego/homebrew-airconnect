@@ -102,9 +102,9 @@ cask "airconnect" do
     name "homebrew.mxcl.airconnect"
     run [opt_bin/"airconnect-service"]
     keep_alive true
-    log_path var/"log/airconnect-service.log"
-    error_log_path var/"log/airconnect-service.log"
-    working_dir var
+    log_path "#{HOMEBREW_PREFIX}/var/log/airconnect-service.log"
+    error_log_path "#{HOMEBREW_PREFIX}/var/log/airconnect-service.log"
+    working_dir "#{HOMEBREW_PREFIX}/var"
     process_type :background
   end
 
@@ -132,7 +132,7 @@ cask "airconnect" do
       MANAGEMENT:
         Use 'airconnect help' for detailed usage information
         Config file: ~/.config/airconnect/airconnect.conf
-        Log files: #{var}/log/
+        Log files: #{HOMEBREW_PREFIX}/var/log/
       
       SERVICES:
         🎵 AirCast  - Streams to Chromecast devices
@@ -158,11 +158,11 @@ cask "airconnect" do
   zap trash: [
     "#{Dir.home}/.config/airconnect",
     "#{HOMEBREW_PREFIX}/var/lib/airconnect",
-    "#{var}/log/aircast.log",
-    "#{var}/log/airupnp.log", 
-    "#{var}/log/airconnect-service.log",
-    "#{var}/run/aircast.pid",
-    "#{var}/run/airupnp.pid",
-    "#{var}/run/airconnect.pid",
+    "#{HOMEBREW_PREFIX}/var/log/aircast.log",
+    "#{HOMEBREW_PREFIX}/var/log/airupnp.log", 
+    "#{HOMEBREW_PREFIX}/var/log/airconnect-service.log",
+    "#{HOMEBREW_PREFIX}/var/run/aircast.pid",
+    "#{HOMEBREW_PREFIX}/var/run/airupnp.pid",
+    "#{HOMEBREW_PREFIX}/var/run/airconnect.pid",
   ]
 end
