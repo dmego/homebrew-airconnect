@@ -22,7 +22,6 @@ class Airconnect < Formula
     (var/"log").mkpath
     (var/"run").mkpath
     (var/"lib/airconnect").mkpath
-    (etc/"airconnect").mkpath
 
     # Download and prepare support scripts
     support_dir = buildpath/"support"
@@ -156,8 +155,8 @@ class Airconnect < Formula
     bin.install support_dir/"airconnect-service.sh" => "airconnect-service"
     bin.install support_dir/"airconnect-manager.sh" => "airconnect"
     
-    # Install default configuration
-    (etc/"airconnect").install support_dir/"airconnect.conf"
+    # Store default configuration template in var/lib for later use
+    (var/"lib/airconnect").install support_dir/"airconnect.conf" => "airconnect.conf.default"
 
     # Remove quarantine attributes to prevent Gatekeeper issues
     [
@@ -213,7 +212,7 @@ class Airconnect < Formula
     
     user_config = config_dir/"airconnect.conf"
     unless user_config.exist?
-      cp etc/"airconnect/airconnect.conf", user_config
+      cp var/"lib/airconnect/airconnect.conf.default", user_config
     end
 
     # Create version info file
@@ -312,8 +311,8 @@ class Airconnect < Formula
     assert_predicate bin/"airconnect-service", :exist?
     assert_predicate bin/"airconnect-service", :executable?
     
-    # Test configuration file
-    assert_predicate etc/"airconnect/airconnect.conf", :exist?
+    # Test default configuration template
+    assert_predicate var/"lib/airconnect/airconnect.conf.default", :exist?
     
     # Test that help command works
     output = shell_output("#{bin}/airconnect help")
