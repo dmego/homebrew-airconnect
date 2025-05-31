@@ -256,9 +256,19 @@ cask "airconnect" do
     EOS
   end
 
-  # Cleanup on uninstall
+  # Fixed cleanup on uninstall - use full path and handle errors gracefully
   uninstall_preflight do
-    system_command "brew", args: ["services", "stop", "airconnect"], sudo: false
+    # Stop the service using launchctl directly since brew command might not be available
+    system_command "launchctl", 
+      args: ["unload", "#{Dir.home}/Library/LaunchAgents/homebrew.mxcl.airconnect.plist"], 
+      sudo: false
+    
+    # Also try to stop processes directly
+    system_command "pkill", 
+      args: ["-f", "aircast|airupnp|airconnect"], 
+      sudo: false
+  rescue
+    # Ignore errors during cleanup
   end
 
   # Complete cleanup on zap
