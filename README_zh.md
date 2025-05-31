@@ -24,7 +24,7 @@ brew tap dmego/airconnect
 
 # 安装 AirConnect（Formula - 推荐用于命令行使用）
 brew install airconnect
-```
+```bash
 
 ### 启动服务
 
@@ -34,7 +34,7 @@ brew services start airconnect
 
 # 检查状态
 airconnect status
-```
+```bash
 
 ## 🎮 使用方法
 
@@ -304,7 +304,7 @@ brew untap dmego/airconnect
 
 ### 仓库结构
 
-```
+```txt
 homebrew-airconnect/
 ├── .github/workflows/          # GitHub Actions
 ├── Casks/airconnect.rb        # 主要 cask 定义
@@ -347,9 +347,3 @@ airconnect logs
 - **问题反馈**: [GitHub Issues](https://github.com/dmego/homebrew-airconnect/issues)
 - **讨论**: [GitHub Discussions](https://github.com/dmego/homebrew-airconnect/discussions)
 - **上游项目**: [AirConnect 仓库](https://github.com/philippe44/AirConnect)
-
----
-
-**用 ❤️ 制作，作者 [dmego](https://github.com/dmego)**
-
-*版本: 1.8.3 | 最后更新: 2025-05-31*

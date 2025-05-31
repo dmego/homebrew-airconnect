@@ -304,7 +304,7 @@ brew untap dmego/airconnect
 
 ### Repository Structure
 
-```
+```txt
 homebrew-airconnect/
 ├── .github/workflows/          # GitHub Actions
 ├── Casks/airconnect.rb        # Main cask definition
@@ -347,9 +347,3 @@ This project is licensed under the MIT License - see the [LICENSE](../LICENSE) f
 - **Issues**: [GitHub Issues](https://github.com/dmego/homebrew-airconnect/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/dmego/homebrew-airconnect/discussions)
 - **Upstream**: [AirConnect Repository](https://github.com/philippe44/AirConnect)
-
----
-
-**Made with ❤️ by [dmego](https://github.com/dmego)**
-
-*Version: 1.8.3 | Last Updated: 2025-05-31*
