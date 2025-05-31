@@ -161,7 +161,8 @@ cask "airconnect" do
         brew upgrade --cask airconnect   # Update to latest version
       
       DOCUMENTATION:
-        https://github.com/dmego/homebrew-airconnect
+        README: https://github.com/dmego/homebrew-airconnect/blob/main/README.md
+        中文说明: https://github.com/dmego/homebrew-airconnect/blob/main/README_zh.md
       
     EOS
   end

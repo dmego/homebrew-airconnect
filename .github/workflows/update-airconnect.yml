@@ -127,14 +127,14 @@ jobs:
           echo "✅ Updated airconnect-manager.sh"
         fi
         
-        # Update README files with new version
-        if [ -f "docs/README.md" ]; then
-          sed -i 's/Version: [0-9.]*/Version: ${{ steps.check_version.outputs.new_version }}/' docs/README.md
+        # Update README files with new version (now in root directory)
+        if [ -f "README.md" ]; then
+          sed -i 's/Version: [0-9.]*/Version: ${{ steps.check_version.outputs.new_version }}/' README.md
           echo "✅ Updated README.md"
         fi
         
-        if [ -f "docs/README_zh.md" ]; then
-          sed -i 's/版本: [0-9.]*/版本: ${{ steps.check_version.outputs.new_version }}/' docs/README_zh.md
+        if [ -f "README_zh.md" ]; then
+          sed -i 's/版本: [0-9.]*/版本: ${{ steps.check_version.outputs.new_version }}/' README_zh.md
           echo "✅ Updated README_zh.md"
         fi
         
@@ -167,8 +167,20 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add .last_version scripts/ docs/ CHANGELOG.md
-        git commit -m "chore: prepare for AirConnect ${{ steps.check_version.outputs.new_version }} update" || exit 0
+        
+        # Add files that exist
+        git add .last_version || true
+        git add scripts/ || true
+        git add README.md || true
+        git add README_zh.md || true
+        git add CHANGELOG.md || true
+        
+        # Only commit if there are changes
+        if ! git diff --cached --quiet; then
+          git commit -m "chore: prepare for AirConnect ${{ steps.check_version.outputs.new_version }} update"
+        else
+          echo "No changes to commit"
+        fi
         
     - name: Create Pull Request
       if: steps.check_version.outputs.update_needed == 'true'
