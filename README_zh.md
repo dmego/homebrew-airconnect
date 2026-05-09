@@ -104,7 +104,7 @@ airupnp -d all=info
 
 ### 配置文件
 
-AirConnect 使用位于 `~/.config/airconnect/airconnect.conf` 的配置文件：
+AirConnect 使用由 Homebrew 管理的包装层配置文件，路径为 `$HOMEBREW_PREFIX/etc/airconnect/airconnect.conf`：
 
 ```bash
 # 编辑配置
@@ -118,8 +118,19 @@ airconnect config show
 
 ```bash
 # 服务参数
-AIRCAST_ARGS="-d all=info"
-AIRUPNP_ARGS="-d all=info"
+AIRCAST_ARGS="-Z -d all=info"
+AIRUPNP_ARGS="-Z -d all=info"
+
+# 共享网络接口覆盖
+NETWORK_INTERFACE="en0"
+
+# 单服务覆盖
+AIRCAST_NETWORK_INTERFACE=""
+AIRUPNP_NETWORK_INTERFACE=""
+
+# 可选的上游 AirConnect XML 配置文件
+AIRCAST_CONFIG_XML=""
+AIRUPNP_CONFIG_XML=""
 
 # 健康监控
 HEALTH_CHECK_INTERVAL="30"
@@ -128,18 +139,42 @@ MAX_RESTART_ATTEMPTS="3"
 
 # 调试模式
 DEBUG="0"
+
+# 当服务日志超过该大小（MB）时轮转
+LOG_MAX_SIZE_MB="10"
 ```
 
 ### 高级配置选项
 
 | 选项 | 描述 | 默认值 |
 |------|------|--------|
-| `AIRCAST_ARGS` | AirCast 服务参数 | `-d all=info` |
-| `AIRUPNP_ARGS` | AirUPnP 服务参数 | `-d all=info` |
+| `AIRCAST_ARGS` | AirCast 服务参数 | `-Z -d all=info` |
+| `AIRUPNP_ARGS` | AirUPnP 服务参数 | `-Z -d all=info` |
+| `NETWORK_INTERFACE` | 对两个服务生效的共享接口/IP 覆盖 | 空 |
+| `AIRCAST_NETWORK_INTERFACE` | 仅对 AirCast 生效的接口/IP 覆盖 | 空 |
+| `AIRUPNP_NETWORK_INTERFACE` | 仅对 AirUPnP 生效的接口/IP 覆盖 | 空 |
+| `AIRCAST_CONFIG_XML` | 通过 `-x` 传递的可选 AirCast XML 配置 | 空 |
+| `AIRUPNP_CONFIG_XML` | 通过 `-x` 传递的可选 AirUPnP XML 配置 | 空 |
 | `HEALTH_CHECK_INTERVAL` | 健康检查频率（秒） | `30` |
 | `RESTART_DELAY` | 重启前延迟（秒） | `5` |
 | `MAX_RESTART_ATTEMPTS` | 最大重启尝试次数 | `3` |
 | `DEBUG` | 启用调试日志 | `0` |
+| `LOG_MAX_SIZE_MB` | 服务日志达到该大小（MB）后轮转 | `10` |
+
+### 包装层配置与上游 XML 的区别
+
+`airconnect config` 管理的是这个 tap 的包装层配置文件，用来控制 `aircast` 和 `airupnp` 的启动参数。
+
+如果 AirConnect 日志里出现 `no config file, using defaults`，它说的是上游可选 XML 配置没有通过 `-x` 传入，并不表示 `$HOMEBREW_PREFIX/etc/airconnect/airconnect.conf` 没有生效。
+
+如果你需要上游 XML 配置，可以先用 `-i` 生成参考文件，再通过 `AIRCAST_CONFIG_XML` / `AIRUPNP_CONFIG_XML` 让包装层把它作为 `-x` 传给上游程序：
+
+```bash
+aircast -i "$HOMEBREW_PREFIX/etc/airconnect/aircast.xml"
+airupnp -i "$HOMEBREW_PREFIX/etc/airconnect/airupnp.xml"
+```
+
+然后在 `airconnect.conf` 中设置 `AIRCAST_CONFIG_XML` 和 `AIRUPNP_CONFIG_XML`。
 
 ## 📊 监控和日志
 

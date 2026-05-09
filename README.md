@@ -106,7 +106,7 @@ airupnp -d all=info
 
 ### Configuration File
 
-AirConnect uses a configuration file located at `~/.config/airconnect/airconnect.conf`:
+AirConnect uses a Homebrew-managed wrapper configuration file located at `$HOMEBREW_PREFIX/etc/airconnect/airconnect.conf`:
 
 ```bash
 # Edit configuration
@@ -120,8 +120,19 @@ airconnect config show
 
 ```bash
 # Service arguments
-AIRCAST_ARGS="-d all=info"
-AIRUPNP_ARGS="-d all=info"
+AIRCAST_ARGS="-Z -d all=info"
+AIRUPNP_ARGS="-Z -d all=info"
+
+# Shared network interface override
+NETWORK_INTERFACE="en0"
+
+# Optional per-service overrides
+AIRCAST_NETWORK_INTERFACE=""
+AIRUPNP_NETWORK_INTERFACE=""
+
+# Optional upstream AirConnect XML config files
+AIRCAST_CONFIG_XML=""
+AIRUPNP_CONFIG_XML=""
 
 # Health monitoring
 HEALTH_CHECK_INTERVAL="30"
@@ -130,18 +141,42 @@ MAX_RESTART_ATTEMPTS="3"
 
 # Debug mode
 DEBUG="0"
+
+# Rotate service logs when they exceed this size in MB
+LOG_MAX_SIZE_MB="10"
 ```
 
 ### Advanced Configuration Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `AIRCAST_ARGS` | Arguments for AirCast service | `-d all=info` |
-| `AIRUPNP_ARGS` | Arguments for AirUPnP service | `-d all=info` |
+| `AIRCAST_ARGS` | Arguments for AirCast service | `-Z -d all=info` |
+| `AIRUPNP_ARGS` | Arguments for AirUPnP service | `-Z -d all=info` |
+| `NETWORK_INTERFACE` | Shared interface/IP override for both services | empty |
+| `AIRCAST_NETWORK_INTERFACE` | AirCast-only interface/IP override | empty |
+| `AIRUPNP_NETWORK_INTERFACE` | AirUPnP-only interface/IP override | empty |
+| `AIRCAST_CONFIG_XML` | Optional upstream AirCast XML config passed with `-x` | empty |
+| `AIRUPNP_CONFIG_XML` | Optional upstream AirUPnP XML config passed with `-x` | empty |
 | `HEALTH_CHECK_INTERVAL` | Health check frequency (seconds) | `30` |
 | `RESTART_DELAY` | Delay before restart (seconds) | `5` |
 | `MAX_RESTART_ATTEMPTS` | Max restart attempts | `3` |
 | `DEBUG` | Enable debug logging | `0` |
+| `LOG_MAX_SIZE_MB` | Rotate service logs after they reach this size in MB | `10` |
+
+### Wrapper Config vs Upstream XML
+
+The file managed by `airconnect config` is the wrapper config for this tap. It controls how `aircast` and `airupnp` are launched.
+
+If AirConnect logs `no config file, using defaults`, that refers to the upstream optional XML config. It does not mean `$HOMEBREW_PREFIX/etc/airconnect/airconnect.conf` was ignored.
+
+If you need an upstream XML config, first generate a reference file with `-i`, then point the wrapper to that file with `AIRCAST_CONFIG_XML` / `AIRUPNP_CONFIG_XML`:
+
+```bash
+aircast -i "$HOMEBREW_PREFIX/etc/airconnect/aircast.xml"
+airupnp -i "$HOMEBREW_PREFIX/etc/airconnect/airupnp.xml"
+```
+
+Then set `AIRCAST_CONFIG_XML` and `AIRUPNP_CONFIG_XML` in `airconnect.conf`.
 
 ## 📊 Monitoring and Logs
 

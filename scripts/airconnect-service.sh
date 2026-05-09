@@ -9,11 +9,20 @@
 set -euo pipefail
 
 # Default configuration
-HOMEBREW_PREFIX="${HOMEBREW_PREFIX:-/opt/homebrew}"
+if [[ -z "${HOMEBREW_PREFIX:-}" ]] && command -v brew >/dev/null 2>&1; then
+    HOMEBREW_PREFIX="$(brew --prefix)"
+else
+    HOMEBREW_PREFIX="${HOMEBREW_PREFIX:-/opt/homebrew}"
+fi
 
 # Source configuration if available
 CONFIG_FILE="$HOMEBREW_PREFIX/etc/airconnect/airconnect.conf"
-[[ -f "$CONFIG_FILE" ]] && source "$CONFIG_FILE"
+CONFIG_LOADED=0
+if [[ -f "$CONFIG_FILE" ]]; then
+    # shellcheck disable=SC1090
+    source "$CONFIG_FILE"
+    CONFIG_LOADED=1
+fi
 
 AIRCAST_BIN="${AIRCAST_BIN:-$HOMEBREW_PREFIX/bin/aircast}"
 AIRUPNP_BIN="${AIRUPNP_BIN:-$HOMEBREW_PREFIX/bin/airupnp}"
@@ -22,11 +31,18 @@ PID_DIR="${PID_DIR:-$HOMEBREW_PREFIX/var/run}"
 SERVICE_NAME="${SERVICE_NAME:-airconnect}"
 
 # Service configuration
-AIRCAST_ARGS="${AIRCAST_ARGS:--d all=info}"
-AIRUPNP_ARGS="${AIRUPNP_ARGS:--d all=info}"
+AIRCAST_ARGS="${AIRCAST_ARGS:--Z -d all=info}"
+AIRUPNP_ARGS="${AIRUPNP_ARGS:--Z -d all=info}"
+NETWORK_INTERFACE="${NETWORK_INTERFACE:-}"
+AIRCAST_NETWORK_INTERFACE="${AIRCAST_NETWORK_INTERFACE:-}"
+AIRUPNP_NETWORK_INTERFACE="${AIRUPNP_NETWORK_INTERFACE:-}"
+AIRCAST_CONFIG_XML="${AIRCAST_CONFIG_XML:-}"
+AIRUPNP_CONFIG_XML="${AIRUPNP_CONFIG_XML:-}"
 HEALTH_CHECK_INTERVAL="${HEALTH_CHECK_INTERVAL:-30}"
 RESTART_DELAY="${RESTART_DELAY:-5}"
 MAX_RESTART_ATTEMPTS="${MAX_RESTART_ATTEMPTS:-3}"
+DEBUG="${DEBUG:-0}"
+LOG_MAX_SIZE_MB="${LOG_MAX_SIZE_MB:-10}"
 
 # Log files
 LOG_FILE="$LOG_DIR/airconnect-service.log"
@@ -41,22 +57,153 @@ SERVICE_PID="$PID_DIR/airconnect.pid"
 # Restart counters
 AIRCAST_RESTART_COUNT=0
 AIRUPNP_RESTART_COUNT=0
+COMMAND_ARGS=()
 
 # Ensure required directories exist
 mkdir -p "$LOG_DIR" "$PID_DIR"
 
 # Logging functions
+file_size_bytes() {
+    local path="$1"
+
+    if stat -f%z "$path" >/dev/null 2>&1; then
+        stat -f%z "$path"
+    else
+        stat -c%s "$path"
+    fi
+}
+
+rotate_log_if_needed() {
+    local path="$1"
+    local max_size_bytes
+    local current_size
+
+    [[ "$LOG_MAX_SIZE_MB" =~ ^[0-9]+$ ]] || return 0
+    [[ "$LOG_MAX_SIZE_MB" -gt 0 ]] || return 0
+    [[ -f "$path" ]] || return 0
+
+    max_size_bytes=$((LOG_MAX_SIZE_MB * 1024 * 1024))
+    current_size="$(file_size_bytes "$path")"
+    [[ "$current_size" -lt "$max_size_bytes" ]] && return 0
+
+    rm -f "${path}.1"
+    mv "$path" "${path}.1"
+}
+
 log() {
+    rotate_log_if_needed "$LOG_FILE"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$SERVICE_NAME] $*" | tee -a "$LOG_FILE"
 }
 
 log_error() {
+    rotate_log_if_needed "$LOG_FILE"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$SERVICE_NAME] ERROR: $*" | tee -a "$LOG_FILE" >&2
 }
 
 log_debug() {
-    # Temporarily enable debug for troubleshooting
+    [[ "$DEBUG" == "1" ]] || return 0
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$SERVICE_NAME] DEBUG: $*" | tee -a "$LOG_FILE"
+}
+
+run_with_timeout() {
+    local seconds="$1"
+    shift
+
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "${seconds}s" "$@"
+    else
+        perl -e 'alarm shift @ARGV; exec @ARGV' "$seconds" "$@"
+    fi
+}
+
+service_binary_for() {
+    case "$1" in
+        aircast) printf '%s\n' "$AIRCAST_BIN" ;;
+        airupnp) printf '%s\n' "$AIRUPNP_BIN" ;;
+        *) return 1 ;;
+    esac
+}
+
+service_legacy_args_for() {
+    case "$1" in
+        aircast) printf '%s\n' "$AIRCAST_ARGS" ;;
+        airupnp) printf '%s\n' "$AIRUPNP_ARGS" ;;
+        *) return 1 ;;
+    esac
+}
+
+service_interface_for() {
+    case "$1" in
+        aircast) printf '%s\n' "${AIRCAST_NETWORK_INTERFACE:-$NETWORK_INTERFACE}" ;;
+        airupnp) printf '%s\n' "${AIRUPNP_NETWORK_INTERFACE:-$NETWORK_INTERFACE}" ;;
+        *) return 1 ;;
+    esac
+}
+
+service_config_xml_for() {
+    case "$1" in
+        aircast) printf '%s\n' "$AIRCAST_CONFIG_XML" ;;
+        airupnp) printf '%s\n' "$AIRUPNP_CONFIG_XML" ;;
+        *) return 1 ;;
+    esac
+}
+
+build_service_argv() {
+    local service="$1"
+    local binary
+    local legacy_args
+    local network_interface
+    local config_xml
+    local args=()
+    local legacy_parts=()
+
+    binary="$(service_binary_for "$service")"
+    legacy_args="$(service_legacy_args_for "$service")"
+    network_interface="$(service_interface_for "$service")"
+    config_xml="$(service_config_xml_for "$service")"
+
+    args+=("$binary")
+    if [[ -n "$legacy_args" ]]; then
+        # Intentionally split legacy flat args so existing AIRCAST_ARGS/AIRUPNP_ARGS
+        # values keep working; structured overrides are appended separately below.
+        # shellcheck disable=SC2206
+        legacy_parts=($legacy_args)
+        args+=("${legacy_parts[@]}")
+    fi
+    if [[ -n "$network_interface" ]]; then
+        args+=("-b" "$network_interface")
+    fi
+    if [[ -n "$config_xml" ]]; then
+        args+=("-x" "$config_xml")
+    fi
+
+    printf '%s\0' "${args[@]}"
+}
+
+load_service_command() {
+    local service="$1"
+    COMMAND_ARGS=()
+
+    while IFS= read -r -d '' arg; do
+        COMMAND_ARGS+=("$arg")
+    done < <(build_service_argv "$service")
+}
+
+command_to_string() {
+    local command_string=""
+    local escaped_arg
+
+    for arg in "$@"; do
+        printf -v escaped_arg '%q' "$arg"
+        command_string+="${command_string:+ }${escaped_arg}"
+    done
+
+    printf '%s\n' "$command_string"
+}
+
+build_service_command() {
+    load_service_command "$1"
+    command_to_string "${COMMAND_ARGS[@]}"
 }
 
 # Check if a process is running by PID
@@ -86,28 +233,33 @@ check_gatekeeper() {
     local temp_output=$(mktemp)
     local test_pid
     
-    # Run the test command in background with timeout
-    timeout 5s "$binary" --help >"$temp_output" 2>&1 &
+    # Run the test command in background with a portable timeout helper
+    run_with_timeout 5 "$binary" --help >"$temp_output" 2>&1 &
     test_pid=$!
     
     # Wait for the command to complete or timeout
+    local exit_code=0
     if wait $test_pid 2>/dev/null; then
-        local exit_code=$?
-        log_debug "$binary_name --help completed with exit code: $exit_code"
-        rm -f "$temp_output"
-        
-        if [[ $exit_code -eq 137 ]]; then  # SIGKILL (Killed: 9)
-            log_error "$binary_name was killed by macOS Gatekeeper (exit code 137)"
-            log_error "This usually means the binary is unsigned or blocked by security settings"
-            log_error "Solutions:"
-            log_error "1. Remove quarantine: xattr -d com.apple.quarantine $binary"
-            log_error "2. Allow in Security & Privacy settings"
-            log_error "3. Reinstall with: brew reinstall airconnect"
-            return 1
-        fi
+        exit_code=0
     else
-        log_debug "$binary_name --help test timed out or failed"
-        rm -f "$temp_output"
+        exit_code=$?
+    fi
+    rm -f "$temp_output"
+
+    if [[ $exit_code -eq 137 ]]; then
+        log_error "$binary_name was killed by macOS Gatekeeper (exit code 137)"
+        log_error "This usually means the binary is unsigned or blocked by security settings"
+        log_error "Solutions:"
+        log_error "1. Remove quarantine: xattr -d com.apple.quarantine $binary"
+        log_error "2. Allow in Security & Privacy settings"
+        log_error "3. Reinstall with: brew reinstall airconnect"
+        return 1
+    fi
+
+    if [[ $exit_code -eq 124 || $exit_code -eq 142 ]]; then
+        log_debug "$binary_name --help test timed out"
+    else
+        log_debug "$binary_name --help completed with exit code: $exit_code"
     fi
     
     log_debug "Gatekeeper check completed for $binary_name"
@@ -137,8 +289,12 @@ start_aircast() {
     fi
     
     # Start AirCast in background
-    log "Executing: $AIRCAST_BIN $AIRCAST_ARGS"
-    nohup $AIRCAST_BIN $AIRCAST_ARGS > "$AIRCAST_LOG" 2>&1 &
+    load_service_command aircast
+    local command_string
+    command_string="$(command_to_string "${COMMAND_ARGS[@]}")"
+    log "Executing: $command_string"
+    rotate_log_if_needed "$AIRCAST_LOG"
+    nohup "${COMMAND_ARGS[@]}" > "$AIRCAST_LOG" 2>&1 &
     local pid=$!
     echo "$pid" > "$AIRCAST_PID"
     log "AirCast started with PID: $pid"
@@ -195,8 +351,12 @@ start_airupnp() {
     fi
     
     # Start AirUPnP in background
-    log "Executing: $AIRUPNP_BIN $AIRUPNP_ARGS"
-    nohup $AIRUPNP_BIN $AIRUPNP_ARGS > "$AIRUPNP_LOG" 2>&1 &
+    load_service_command airupnp
+    local command_string
+    command_string="$(command_to_string "${COMMAND_ARGS[@]}")"
+    log "Executing: $command_string"
+    rotate_log_if_needed "$AIRUPNP_LOG"
+    nohup "${COMMAND_ARGS[@]}" > "$AIRUPNP_LOG" 2>&1 &
     local pid=$!
     echo "$pid" > "$AIRUPNP_PID"
     log "AirUPnP started with PID: $pid"
@@ -337,6 +497,7 @@ main() {
     log "AirConnect service manager starting (version 1.0.1)"
     log "Service manager PID: $$"
     log "Configuration file: $CONFIG_FILE"
+    log "Configuration loaded: $([[ $CONFIG_LOADED -eq 1 ]] && printf 'yes' || printf 'no')"
     log "Log directory: $LOG_DIR"
     log "PID directory: $PID_DIR"
     log "Health check interval: ${HEALTH_CHECK_INTERVAL}s"
@@ -370,5 +531,6 @@ main() {
     done
 }
 
-# Start main function
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

@@ -55,10 +55,15 @@ jobs:
           
           # Read current version from Formula file
           formula_content = File.read('${{ env.FORMULA_FILE }}')
-          current_version_match = formula_content.match(/version\s+"([^"]+)"/)
+          current_version_match = formula_content.match(%r{releases/download/([^/]+)/AirConnect-[^/]+\.zip})
           current_version = current_version_match ? current_version_match[1] : nil
           
           puts "📋 Current Formula version: #{current_version || 'not found'}"
+
+          if current_version.nil? || current_version.empty?
+            puts "❌ Could not determine current Formula version from URL"
+            exit 1
+          end
           
           # Check if update is needed
           if latest_version != current_version
@@ -80,6 +85,7 @@ jobs:
               # Get release information
               release_date = latest_release.published_at.strftime('%Y-%m-%d')
               release_body = latest_release.body || "No release notes available"
+              delimiter = "RELEASE_NOTES_#{rand(1_000_000)}"
               
               # Output for GitHub Actions
               File.open(ENV['GITHUB_OUTPUT'], 'a') do |f|
@@ -90,9 +96,9 @@ jobs:
                 f.puts "download_url=#{download_url}"
                 f.puts "file_size=#{file_size}"
                 f.puts "release_date=#{release_date}"
-                f.puts "release_notes<<EOF"
+                f.puts "release_notes<<#{delimiter}"
                 f.puts release_body
-                f.puts "EOF"
+                f.puts delimiter
               end
               
             rescue => e
@@ -128,8 +134,8 @@ jobs:
         # Create backup of original file
         cp ${{ env.FORMULA_FILE }} ${{ env.FORMULA_FILE }}.backup
         
-        # Update version and SHA256 in the Formula file
-        sed -i 's/version "[^"]*"/version "${{ steps.check_version.outputs.new_version }}"/' ${{ env.FORMULA_FILE }}
+        # Update url and SHA256 in the Formula file
+        sed -i 's#^  url "https://github.com/philippe44/AirConnect/releases/download/[^"]*/AirConnect-[^"]*\\.zip"$#  url "https://github.com/philippe44/AirConnect/releases/download/${{ steps.check_version.outputs.new_version }}/AirConnect-${{ steps.check_version.outputs.new_version }}.zip"#' ${{ env.FORMULA_FILE }}
         sed -i 's/sha256 "[^"]*"/sha256 "${{ steps.check_version.outputs.new_sha256 }}"/' ${{ env.FORMULA_FILE }}
         
         echo "✅ Updated ${{ env.FORMULA_FILE }}"
@@ -137,9 +143,9 @@ jobs:
         # Verify the changes
         echo "📋 Verification:"
         echo "Before:"
-        grep -E "(version|sha256)" ${{ env.FORMULA_FILE }}.backup
+        grep -E "(url|sha256)" ${{ env.FORMULA_FILE }}.backup
         echo "After:"
-        grep -E "(version|sha256)" ${{ env.FORMULA_FILE }}
+        grep -E "(url|sha256)" ${{ env.FORMULA_FILE }}
         
         # Remove backup file
         rm ${{ env.FORMULA_FILE }}.backup

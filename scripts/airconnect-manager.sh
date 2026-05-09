@@ -9,7 +9,11 @@
 set -euo pipefail
 
 # Configuration
-HOMEBREW_PREFIX="${HOMEBREW_PREFIX:-/opt/homebrew}"
+if [[ -z "${HOMEBREW_PREFIX:-}" ]] && command -v brew >/dev/null 2>&1; then
+    HOMEBREW_PREFIX="$(brew --prefix)"
+else
+    HOMEBREW_PREFIX="${HOMEBREW_PREFIX:-/opt/homebrew}"
+fi
 CONFIG_DIR="$HOMEBREW_PREFIX/etc/airconnect"
 CONFIG_FILE="$CONFIG_DIR/airconnect.conf"
 LOG_DIR="$HOMEBREW_PREFIX/var/log"
@@ -169,6 +173,7 @@ show_logs() {
 # Configuration management
 manage_config() {
     local action="${1:-edit}"
+    local reset_confirmed=0
     
     case "$action" in
         edit)
@@ -201,9 +206,19 @@ manage_config() {
             ;;
         reset)
             print_warning "This will reset your configuration to defaults."
-            read -p "Are you sure? (y/N): " -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
+
+            if [[ "${AIRCONNECT_ASSUME_YES:-0}" == "1" ]]; then
+                reset_confirmed=1
+            elif [[ ! -t 0 ]]; then
+                print_error "Reset requires confirmation in interactive mode. Set AIRCONNECT_ASSUME_YES=1 to run non-interactively."
+                return 1
+            else
+                read -p "Are you sure? (y/N): " -n 1 -r
+                echo
+                [[ $REPLY =~ ^[Yy]$ ]] && reset_confirmed=1
+            fi
+
+            if [[ $reset_confirmed -eq 1 ]]; then
                 create_default_config
                 print_status "Configuration reset to defaults"
             else
@@ -221,22 +236,34 @@ manage_config() {
 create_default_config() {
     mkdir -p "$CONFIG_DIR"
     
-    cat > "$CONFIG_FILE" << 'EOF'
+    cat > "$CONFIG_FILE" <<EOF
 # AirConnect Configuration File
 # Edit this file to customize AirConnect behavior
 
 # Service binaries (usually don't need to change these)
-AIRCAST_BIN="/opt/homebrew/bin/aircast"
-AIRUPNP_BIN="/opt/homebrew/bin/airupnp"
+AIRCAST_BIN="\${HOMEBREW_PREFIX}/bin/aircast"
+AIRUPNP_BIN="\${HOMEBREW_PREFIX}/bin/airupnp"
 
 # Log and PID directories
-LOG_DIR="/opt/homebrew/var/log"
-PID_DIR="/opt/homebrew/var/run"
+LOG_DIR="\${HOMEBREW_PREFIX}/var/log"
+PID_DIR="\${HOMEBREW_PREFIX}/var/run"
 
 # Service arguments
-# -d all: discover all devices
-AIRCAST_ARGS="-d all=info"
-AIRUPNP_ARGS="-d all=info"
+# Include -Z because the service runs these processes in the background.
+AIRCAST_ARGS="-Z -d all=info"
+AIRUPNP_ARGS="-Z -d all=info"
+
+# Shared network interface override for both services.
+# Example: NETWORK_INTERFACE="en0"
+NETWORK_INTERFACE=""
+
+# Service-specific overrides take precedence over NETWORK_INTERFACE.
+AIRCAST_NETWORK_INTERFACE=""
+AIRUPNP_NETWORK_INTERFACE=""
+
+# Optional upstream AirConnect XML config files.
+AIRCAST_CONFIG_XML=""
+AIRUPNP_CONFIG_XML=""
 
 # Health monitoring
 HEALTH_CHECK_INTERVAL="30"  # seconds between health checks
@@ -246,11 +273,15 @@ MAX_RESTART_ATTEMPTS="3"    # max restart attempts before giving up
 # Debug mode (1 to enable, 0 to disable)
 DEBUG="0"
 
+# Rotate service logs when they exceed this size in MB.
+LOG_MAX_SIZE_MB="10"
+
 # Custom device exclusions (comma-separated)
 # EXCLUDED_DEVICES="device1,device2"
 
-# Network interface (leave empty for auto-detection)
-# NETWORK_INTERFACE="en0"
+# Examples:
+# AIRCAST_NETWORK_INTERFACE="en0"
+# AIRCAST_CONFIG_XML="/opt/homebrew/etc/airconnect/aircast.xml"
 EOF
 
     print_status "Default configuration created at $CONFIG_FILE"
