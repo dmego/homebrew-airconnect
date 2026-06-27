@@ -8,6 +8,21 @@ class Airconnect < Formula
   license "MIT"
   depends_on :macos
 
+  resource "airconnect-service" do
+    url "https://raw.githubusercontent.com/dmego/homebrew-airconnect/c1cec2d074e78667e04d600cea02a0d16824b255/scripts/airconnect-service.sh"
+    sha256 "b666d03ef40a9a78ca3344145c0d310d607391c7feab0fac1b9ff9b1e44f50d4"
+  end
+
+  resource "airconnect-manager" do
+    url "https://raw.githubusercontent.com/dmego/homebrew-airconnect/c1cec2d074e78667e04d600cea02a0d16824b255/scripts/airconnect-manager.sh"
+    sha256 "6fd95e3843dc3e535b9f4758a21b464ef9b6703abe4e7c69c223f8e26b5d8cf3"
+  end
+
+  resource "airconnect-config" do
+    url "https://raw.githubusercontent.com/dmego/homebrew-airconnect/c1cec2d074e78667e04d600cea02a0d16824b255/configs/airconnect.conf"
+    sha256 "54ad3540cd8abdd5352f1633818047bf5527cd4292b1a088c143d902556eeedc"
+  end
+
   livecheck do
     url :stable
     strategy :github_latest
@@ -26,21 +41,21 @@ class Airconnect < Formula
     (var/"run").mkpath
     (var/"lib/airconnect").mkpath
 
-    support_root = Pathname(__dir__).parent
-    service_script = support_root/"scripts/airconnect-service.sh"
-    manager_script = support_root/"scripts/airconnect-manager.sh"
-    config_template = support_root/"configs/airconnect.conf"
+    resource("airconnect-service").stage do
+      bin.install "airconnect-service.sh" => "airconnect-service"
+    end
 
-    odie "Missing support script: #{service_script}" unless service_script.exist?
-    odie "Missing support script: #{manager_script}" unless manager_script.exist?
-    odie "Missing support config: #{config_template}" unless config_template.exist?
+    resource("airconnect-manager").stage do
+      bin.install "airconnect-manager.sh" => "airconnect"
+    end
 
-    # Install the service wrapper and management tool
-    bin.install service_script => "airconnect-service"
-    bin.install manager_script => "airconnect"
+    chmod 0755, bin/"airconnect-service"
+    chmod 0755, bin/"airconnect"
     
     # Store default configuration template in var/lib for later use
-    (var/"lib/airconnect").install config_template => "airconnect.conf.default"
+    resource("airconnect-config").stage do
+      (var/"lib/airconnect").install "airconnect.conf" => "airconnect.conf.default"
+    end
 
     # Remove quarantine attributes to prevent Gatekeeper issues
     [

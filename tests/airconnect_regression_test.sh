@@ -192,18 +192,25 @@ EOF
   rm -rf "$tmpdir"
 }
 
-test_formula_uses_repo_support_files() {
+test_formula_uses_pinned_support_resources() {
   local output
   output="$(
     ruby -e '
       formula = File.read(ARGV[0])
-      uses_remote_support = formula.include?("raw.githubusercontent.com/dmego/homebrew-airconnect/main")
-      uses_curl_download = formula.include?("system \"curl\"")
-      puts(uses_remote_support || uses_curl_download ? "remote" : "local")
+      uses_tap_checkout = formula.include?("Pathname(__dir__).parent") ||
+        formula.include?("support_root") ||
+        formula.include?("Library/Taps")
+      has_support_resources = formula.include?("resource \"airconnect-service\"") &&
+        formula.include?("resource \"airconnect-manager\"") &&
+        formula.include?("resource \"airconnect-config\"")
+      uses_pinned_raw_urls = formula.match?(%r{raw.githubusercontent.com/dmego/homebrew-airconnect/[0-9a-f]{40}/scripts/airconnect-service\.sh}) &&
+        formula.match?(%r{raw.githubusercontent.com/dmego/homebrew-airconnect/[0-9a-f]{40}/scripts/airconnect-manager\.sh}) &&
+        formula.match?(%r{raw.githubusercontent.com/dmego/homebrew-airconnect/[0-9a-f]{40}/configs/airconnect\.conf})
+      puts(!uses_tap_checkout && has_support_resources && uses_pinned_raw_urls ? "resource" : "tap-checkout")
     ' "$FORMULA_FILE"
   )"
 
-  [[ "$output" == "local" ]] || fail "Formula should install support files from the tap checkout instead of downloading from main"
+  [[ "$output" == "resource" ]] || fail "Formula should install support files from pinned resources instead of the tap checkout"
 }
 
 test_formula_uninstall_preserves_user_config() {
@@ -288,7 +295,7 @@ test_formula_preserves_existing_config
 test_workflow_uses_updater_and_verifies_diff
 test_airconnect_updater_updates_formula_and_is_idempotent
 test_airconnect_updater_ignores_release_note_headings_when_checking_changelog_entries
-test_formula_uses_repo_support_files
+test_formula_uses_pinned_support_resources
 test_formula_uninstall_preserves_user_config
 test_formula_avoids_shell_rm_rf
 test_formula_requires_fileutils
