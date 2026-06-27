@@ -8,19 +8,9 @@ class Airconnect < Formula
   license "MIT"
   depends_on :macos
 
-  resource "airconnect-service" do
-    url "https://raw.githubusercontent.com/dmego/homebrew-airconnect/c1cec2d074e78667e04d600cea02a0d16824b255/scripts/airconnect-service.sh"
-    sha256 "b666d03ef40a9a78ca3344145c0d310d607391c7feab0fac1b9ff9b1e44f50d4"
-  end
-
-  resource "airconnect-manager" do
-    url "https://raw.githubusercontent.com/dmego/homebrew-airconnect/c1cec2d074e78667e04d600cea02a0d16824b255/scripts/airconnect-manager.sh"
-    sha256 "6fd95e3843dc3e535b9f4758a21b464ef9b6703abe4e7c69c223f8e26b5d8cf3"
-  end
-
-  resource "airconnect-config" do
-    url "https://raw.githubusercontent.com/dmego/homebrew-airconnect/c1cec2d074e78667e04d600cea02a0d16824b255/configs/airconnect.conf"
-    sha256 "54ad3540cd8abdd5352f1633818047bf5527cd4292b1a088c143d902556eeedc"
+  resource "airconnect-support" do
+    url "https://github.com/dmego/homebrew-airconnect/releases/download/airconnect-support-1.9.3/homebrew-airconnect-support-1.9.3.tar.gz"
+    sha256 "127d5aa9816522790d500f10d338d8dcfc8d9f62c86fc9dcb7df719997f2bc33"
   end
 
   livecheck do
@@ -41,21 +31,14 @@ class Airconnect < Formula
     (var/"run").mkpath
     (var/"lib/airconnect").mkpath
 
-    resource("airconnect-service").stage do
-      bin.install "airconnect-service.sh" => "airconnect-service"
-    end
-
-    resource("airconnect-manager").stage do
-      bin.install "airconnect-manager.sh" => "airconnect"
+    resource("airconnect-support").stage do
+      bin.install "scripts/airconnect-service.sh" => "airconnect-service"
+      bin.install "scripts/airconnect-manager.sh" => "airconnect"
+      (var/"lib/airconnect").install "configs/airconnect.conf" => "airconnect.conf.default"
     end
 
     chmod 0755, bin/"airconnect-service"
     chmod 0755, bin/"airconnect"
-    
-    # Store default configuration template in var/lib for later use
-    resource("airconnect-config").stage do
-      (var/"lib/airconnect").install "airconnect.conf" => "airconnect.conf.default"
-    end
 
     # Remove quarantine attributes to prevent Gatekeeper issues
     [

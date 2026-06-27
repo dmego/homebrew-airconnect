@@ -42,6 +42,41 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Package AirConnect support resource
+      if: steps.update.outputs.update_needed == 'true'
+      run: |
+        VERSION="${{ steps.update.outputs.new_version }}"
+        TAG="airconnect-support-${VERSION}"
+        ARCHIVE="homebrew-airconnect-support-${VERSION}.tar.gz"
+        ARCHIVE_PATH="${RUNNER_TEMP}/${ARCHIVE}"
+
+        tar -czf "${ARCHIVE_PATH}" \
+          scripts/airconnect-service.sh \
+          scripts/airconnect-manager.sh \
+          configs/airconnect.conf
+
+        export SUPPORT_SHA256
+        SUPPORT_SHA256="$(sha256sum "${ARCHIVE_PATH}" | awk '{print $1}')"
+
+        gh release view "${TAG}" >/dev/null 2>&1 || \
+          gh release create "${TAG}" --title "AirConnect support files ${VERSION}" --notes "Versioned support files for the Homebrew AirConnect formula."
+        gh release upload "${TAG}" "${ARCHIVE_PATH}" --clobber
+
+        ruby -e '
+          version = ENV.fetch("VERSION")
+          sha = ENV.fetch("SUPPORT_SHA256")
+          archive = "homebrew-airconnect-support-#{version}.tar.gz"
+          url = "https://github.com/dmego/homebrew-airconnect/releases/download/airconnect-support-#{version}/#{archive}"
+          formula = File.read("Formula/airconnect.rb")
+          replacement = %(resource "airconnect-support" do\n    url "#{url}"\n    sha256 "#{sha}"\n  end)
+          updated = formula.sub(/resource "airconnect-support" do\n    url "[^"]+"\n    sha256 "[^"]+"\n  end/m, replacement)
+          abort("airconnect-support resource block was not updated") if updated == formula
+          File.write("Formula/airconnect.rb", updated)
+        '
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        VERSION: ${{ steps.update.outputs.new_version }}
+
     - name: Run regression checks
       run: bash tests/airconnect_regression_test.sh
 
@@ -90,6 +125,7 @@ jobs:
           - Downloaded upstream release asset and calculated SHA256.
           - Updated Formula URL and SHA256.
           - Updated manager version metadata.
+          - Published versioned support resource archive.
           - Updated CHANGELOG without duplicate entries.
           - Ran repository regression checks.
         branch: update-airconnect-${{ steps.update.outputs.new_version }}

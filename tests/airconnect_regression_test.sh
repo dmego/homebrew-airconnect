@@ -84,8 +84,11 @@ test_workflow_uses_updater_and_verifies_diff() {
       verifies_expected_paths = workflow.include?("unexpected = changed - expected")
       has_add_paths = workflow.include?("add-paths: |") && workflow.include?("Formula/airconnect.rb")
       uses_safe_release_notes = workflow.include?("steps.update.outputs.release_notes_block")
+      packages_support_archive = workflow.include?("homebrew-airconnect-support-${VERSION}.tar.gz") &&
+        workflow.include?("gh release upload") &&
+        workflow.include?("resource \"airconnect-support\"")
       no_manual_commit = !workflow.include?("git commit")
-      puts(uses_updater && runs_tests && verifies_expected_paths && has_add_paths && uses_safe_release_notes && no_manual_commit ? "ok" : "missing")
+      puts(uses_updater && runs_tests && verifies_expected_paths && has_add_paths && uses_safe_release_notes && packages_support_archive && no_manual_commit ? "ok" : "missing")
     ' "$ROOT_DIR/.github/workflows/update-airconnect.yml"
   )"
 
@@ -200,13 +203,13 @@ test_formula_uses_pinned_support_resources() {
       uses_tap_checkout = formula.include?("Pathname(__dir__).parent") ||
         formula.include?("support_root") ||
         formula.include?("Library/Taps")
-      has_support_resources = formula.include?("resource \"airconnect-service\"") &&
-        formula.include?("resource \"airconnect-manager\"") &&
+      has_support_archive = formula.include?("resource \"airconnect-support\"") &&
+        formula.match?(%r{github.com/dmego/homebrew-airconnect/releases/download/airconnect-support-[^/]+/homebrew-airconnect-support-[^/]+\.tar\.gz})
+      has_split_raw_resources = formula.include?("raw.githubusercontent.com") ||
+        formula.include?("resource \"airconnect-service\"") ||
+        formula.include?("resource \"airconnect-manager\"") ||
         formula.include?("resource \"airconnect-config\"")
-      uses_pinned_raw_urls = formula.match?(%r{raw.githubusercontent.com/dmego/homebrew-airconnect/[0-9a-f]{40}/scripts/airconnect-service\.sh}) &&
-        formula.match?(%r{raw.githubusercontent.com/dmego/homebrew-airconnect/[0-9a-f]{40}/scripts/airconnect-manager\.sh}) &&
-        formula.match?(%r{raw.githubusercontent.com/dmego/homebrew-airconnect/[0-9a-f]{40}/configs/airconnect\.conf})
-      puts(!uses_tap_checkout && has_support_resources && uses_pinned_raw_urls ? "resource" : "tap-checkout")
+      puts(!uses_tap_checkout && has_support_archive && !has_split_raw_resources ? "resource" : "tap-checkout")
     ' "$FORMULA_FILE"
   )"
 
