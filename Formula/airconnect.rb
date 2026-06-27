@@ -48,7 +48,7 @@ class Airconnect < Formula
     ].each do |binary|
       next unless binary.exist?
 
-      system "xattr", "-d", "com.apple.quarantine", binary.to_s
+      quiet_system "xattr", "-d", "com.apple.quarantine", binary.to_s
     end
   end
 

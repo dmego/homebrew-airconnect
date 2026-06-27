@@ -254,6 +254,20 @@ test_formula_requires_fileutils() {
   [[ "$output" == "required" ]] || fail "Formula should require fileutils before using FileUtils helpers"
 }
 
+test_formula_ignores_missing_quarantine_xattr() {
+  local output
+  output="$(
+    ruby -e '
+      formula = File.read(ARGV[0])
+      fatal_xattr_delete = formula.match?(/^\s*system "xattr", "-d", "com\.apple\.quarantine"/)
+      nonfatal_xattr_delete = formula.match?(/^\s*quiet_system "xattr", "-d", "com\.apple\.quarantine"/)
+      puts(!fatal_xattr_delete && nonfatal_xattr_delete ? "nonfatal" : "fatal")
+    ' "$FORMULA_FILE"
+  )"
+
+  [[ "$output" == "nonfatal" ]] || fail "Formula should not fail when quarantine xattr is absent"
+}
+
 test_manager_reset_noninteractive() {
   local prefix
   prefix="$(mktemp -d)"
@@ -302,6 +316,7 @@ test_formula_uses_pinned_support_resources
 test_formula_uninstall_preserves_user_config
 test_formula_avoids_shell_rm_rf
 test_formula_requires_fileutils
+test_formula_ignores_missing_quarantine_xattr
 test_manager_reset_noninteractive
 test_service_log_rotation
 
