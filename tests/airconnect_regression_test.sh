@@ -6,6 +6,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SERVICE_SCRIPT="$ROOT_DIR/scripts/airconnect-service.sh"
 FORMULA_FILE="$ROOT_DIR/Formula/airconnect.rb"
 MANAGER_SCRIPT="$ROOT_DIR/scripts/airconnect-manager.sh"
+UPDATER_SCRIPT="$ROOT_DIR/scripts/update-airconnect-release.rb"
 
 fail() {
   echo "FAIL: $*" >&2
@@ -73,18 +74,119 @@ test_formula_preserves_existing_config() {
   [[ "$output" == "guarded" ]] || fail "Formula post_install should preserve existing user config"
 }
 
-test_workflow_updates_url_and_sha_together() {
+test_workflow_uses_updater_and_verifies_diff() {
   local output
   output="$(
     ruby -e '
       workflow = File.read(ARGV[0])
-      has_url_update = workflow.match?(%r{sed -i .s#\^  url "https://github.com/philippe44/AirConnect/releases/download/})
-      has_sha_update = workflow.match?(%r{sed -i .s/sha256 "\[\^"\]\*"/sha256})
-      puts(has_url_update && has_sha_update ? "ok" : "missing")
+      uses_updater = workflow.include?("ruby scripts/update-airconnect-release.rb")
+      runs_tests = workflow.include?("bash tests/airconnect_regression_test.sh")
+      verifies_expected_paths = workflow.include?("unexpected = changed - expected")
+      has_add_paths = workflow.include?("add-paths: |") && workflow.include?("Formula/airconnect.rb")
+      uses_safe_release_notes = workflow.include?("steps.update.outputs.release_notes_block")
+      no_manual_commit = !workflow.include?("git commit")
+      puts(uses_updater && runs_tests && verifies_expected_paths && has_add_paths && uses_safe_release_notes && no_manual_commit ? "ok" : "missing")
     ' "$ROOT_DIR/.github/workflows/update-airconnect.yml"
   )"
 
-  [[ "$output" == "ok" ]] || fail "workflow should update formula url and sha256 together"
+  [[ "$output" == "ok" ]] || fail "workflow should delegate updates, enforce diff scope, restrict PR paths, and use safe release notes"
+}
+
+test_airconnect_updater_updates_formula_and_is_idempotent() {
+  local tmpdir
+  tmpdir="$(mktemp -d)"
+  mkdir -p "$tmpdir/Formula" "$tmpdir/scripts"
+
+  cat >"$tmpdir/Formula/airconnect.rb" <<'EOF'
+class Airconnect < Formula
+  url "https://github.com/philippe44/AirConnect/releases/download/1.8.3/AirConnect-1.8.3.zip"
+  sha256 "oldsha"
+end
+EOF
+
+  cat >"$tmpdir/scripts/airconnect-manager.sh" <<'EOF'
+AIRCONNECT_VERSION="1.8.3"
+EOF
+
+  cat >"$tmpdir/CHANGELOG.md" <<'EOF'
+# Changelog
+
+## [1.8.3] - 2024-03-15
+
+### Updated
+- AirConnect from version  to 1.8.3
+EOF
+
+  AIRCONNECT_UPDATER_OFFLINE=1 \
+    AIRCONNECT_UPDATER_ROOT="$tmpdir" \
+    AIRCONNECT_UPDATER_VERSION="1.9.3" \
+    AIRCONNECT_UPDATER_SHA256="9ad2bf7397e1c7617c3112dd4c450b5f403a62470ad9e9e6a04db1b0f2f6db73" \
+    AIRCONNECT_UPDATER_RELEASE_DATE="2025-11-21" \
+    AIRCONNECT_UPDATER_FILE_SIZE="90.2" \
+    ruby "$UPDATER_SCRIPT" >/dev/null
+
+  local formula
+  formula="$(cat "$tmpdir/Formula/airconnect.rb")"
+  assert_contains "$formula" 'releases/download/1.9.3/AirConnect-1.9.3.zip' "updater should change Formula URL to the new version"
+  assert_contains "$formula" 'sha256 "9ad2bf7397e1c7617c3112dd4c450b5f403a62470ad9e9e6a04db1b0f2f6db73"' "updater should change Formula sha256"
+
+  local manager
+  manager="$(cat "$tmpdir/scripts/airconnect-manager.sh")"
+  assert_contains "$manager" 'AIRCONNECT_VERSION="1.9.3"' "updater should change manager AirConnect version"
+
+  AIRCONNECT_UPDATER_OFFLINE=1 \
+    AIRCONNECT_UPDATER_ROOT="$tmpdir" \
+    AIRCONNECT_UPDATER_VERSION="1.9.3" \
+    AIRCONNECT_UPDATER_SHA256="9ad2bf7397e1c7617c3112dd4c450b5f403a62470ad9e9e6a04db1b0f2f6db73" \
+    AIRCONNECT_UPDATER_RELEASE_DATE="2025-11-21" \
+    AIRCONNECT_UPDATER_FILE_SIZE="90.2" \
+    ruby "$UPDATER_SCRIPT" >/dev/null
+
+  local entry_count
+  entry_count="$(grep -c '^## \[1\.9\.3\]' "$tmpdir/CHANGELOG.md")"
+  [[ "$entry_count" == "1" ]] || fail "updater should not duplicate changelog entries for the same version"
+
+  rm -rf "$tmpdir"
+}
+
+test_airconnect_updater_ignores_release_note_headings_when_checking_changelog_entries() {
+  local tmpdir
+  tmpdir="$(mktemp -d)"
+  mkdir -p "$tmpdir/Formula" "$tmpdir/scripts"
+
+  cat >"$tmpdir/Formula/airconnect.rb" <<'EOF'
+class Airconnect < Formula
+  url "https://github.com/philippe44/AirConnect/releases/download/1.8.3/AirConnect-1.8.3.zip"
+  sha256 "oldsha"
+end
+EOF
+
+  cat >"$tmpdir/scripts/airconnect-manager.sh" <<'EOF'
+AIRCONNECT_VERSION="1.8.3"
+EOF
+
+  cat >"$tmpdir/CHANGELOG.md" <<'EOF'
+# Changelog
+EOF
+
+  AIRCONNECT_UPDATER_OFFLINE=1 \
+    AIRCONNECT_UPDATER_ROOT="$tmpdir" \
+    AIRCONNECT_UPDATER_VERSION="1.9.3" \
+    AIRCONNECT_UPDATER_SHA256="9ad2bf7397e1c7617c3112dd4c450b5f403a62470ad9e9e6a04db1b0f2f6db73" \
+    AIRCONNECT_UPDATER_RELEASE_DATE="2025-11-21" \
+    AIRCONNECT_UPDATER_FILE_SIZE="90.2" \
+    AIRCONNECT_UPDATER_RELEASE_NOTES=$'## [1.9.3]\n- upstream note with matching heading\n| column | value |' \
+    ruby "$UPDATER_SCRIPT" >/dev/null
+
+  local changelog
+  changelog="$(cat "$tmpdir/CHANGELOG.md")"
+  assert_contains "$changelog" '<!-- airconnect-updater:version=1.9.3 -->' "updater should add a machine-readable changelog marker"
+
+  local marker_count
+  marker_count="$(grep -c '<!-- airconnect-updater:version=1\.9\.3 -->' "$tmpdir/CHANGELOG.md")"
+  [[ "$marker_count" == "1" ]] || fail "updater should count changelog entries by marker, not release-note headings"
+
+  rm -rf "$tmpdir"
 }
 
 test_formula_uses_repo_support_files() {
@@ -180,7 +282,9 @@ PY
 
 test_service_argument_translation
 test_formula_preserves_existing_config
-test_workflow_updates_url_and_sha_together
+test_workflow_uses_updater_and_verifies_diff
+test_airconnect_updater_updates_formula_and_is_idempotent
+test_airconnect_updater_ignores_release_note_headings_when_checking_changelog_entries
 test_formula_uses_repo_support_files
 test_formula_uninstall_preserves_user_config
 test_formula_avoids_shell_rm_rf

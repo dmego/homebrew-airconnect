@@ -2,13 +2,20 @@ name: Update AirConnect Version
 
 on:
   schedule:
-    # Check for updates every day at 2 AM UTC
     - cron: '0 2 * * *'
-  workflow_dispatch: # Allow manual triggering
+  workflow_dispatch:
   push:
     branches: [ main ]
-    paths: [ '.github/workflows/update-airconnect.yml' ]
-  
+    paths: [ '.github/workflows/update-airconnect.yml', 'scripts/update-airconnect-release.rb' ]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-airconnect
+  cancel-in-progress: false
+
 env:
   UPSTREAM_REPO: philippe44/AirConnect
   FORMULA_FILE: Formula/airconnect.rb
@@ -16,262 +23,79 @@ env:
 jobs:
   check-and-update:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         fetch-depth: 0
-        
+
     - name: Set up Ruby
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: '3.2'
-        
-    - name: Install dependencies
-      run: |
-        gem install octokit
-        
-    - name: Check for new version
-      id: check_version
-      run: |
-        # Create a temporary Ruby script in /tmp to avoid polluting the repo
-        cat > /tmp/check_version.rb << 'EOF'
-        require 'octokit'
-        require 'json'
-        require 'open-uri'
-        require 'digest'
-        
-        # Initialize GitHub client
-        client = Octokit::Client.new(access_token: ENV['GITHUB_TOKEN'])
-        
-        begin
-          # Get latest release from upstream
-          latest_release = client.latest_release('${{ env.UPSTREAM_REPO }}')
-          latest_version = latest_release.tag_name
-          
-          puts "🔍 Latest upstream version: #{latest_version}"
-          
-          # Read current version from Formula file
-          formula_content = File.read('${{ env.FORMULA_FILE }}')
-          current_version_match = formula_content.match(%r{releases/download/([^/]+)/AirConnect-[^/]+\.zip})
-          current_version = current_version_match ? current_version_match[1] : nil
-          
-          puts "📋 Current Formula version: #{current_version || 'not found'}"
 
-          if current_version.nil? || current_version.empty?
-            puts "❌ Could not determine current Formula version from URL"
-            exit 1
-          end
-          
-          # Check if update is needed
-          if latest_version != current_version
-            puts "🔄 Update needed: #{current_version || 'none'} -> #{latest_version}"
-            
-            # Download the new release to get SHA256
-            download_url = "https://github.com/${{ env.UPSTREAM_REPO }}/releases/download/#{latest_version}/AirConnect-#{latest_version}.zip"
-            puts "⬇️  Downloading: #{download_url}"
-            
-            begin
-              file_content = URI.open(download_url, 'User-Agent' => 'GitHub-Actions').read
-              sha256 = Digest::SHA256.hexdigest(file_content)
-              file_size = (file_content.length / 1024.0 / 1024.0).round(2)
-              
-              puts "✅ Download successful"
-              puts "📏 File size: #{file_size} MB"
-              puts "🔐 SHA256: #{sha256}"
-              
-              # Get release information
-              release_date = latest_release.published_at.strftime('%Y-%m-%d')
-              release_body = latest_release.body || "No release notes available"
-              delimiter = "RELEASE_NOTES_#{rand(1_000_000)}"
-              
-              # Output for GitHub Actions
-              File.open(ENV['GITHUB_OUTPUT'], 'a') do |f|
-                f.puts "update_needed=true"
-                f.puts "current_version=#{current_version}"
-                f.puts "new_version=#{latest_version}"
-                f.puts "new_sha256=#{sha256}"
-                f.puts "download_url=#{download_url}"
-                f.puts "file_size=#{file_size}"
-                f.puts "release_date=#{release_date}"
-                f.puts "release_notes<<#{delimiter}"
-                f.puts release_body
-                f.puts delimiter
-              end
-              
-            rescue => e
-              puts "❌ Failed to download or process release: #{e.message}"
-              exit 1
-            end
-          else
-            puts "✅ No update needed - already at latest version"
-            File.open(ENV['GITHUB_OUTPUT'], 'a') do |f|
-              f.puts "update_needed=false"
-            end
-          end
-          
-        rescue => e
-          puts "❌ Error checking for updates: #{e.message}"
-          exit 1
-        end
-        EOF
-        
-        # Run the script from /tmp
-        ruby /tmp/check_version.rb
-        
-        # Clean up the temporary script
-        rm -f /tmp/check_version.rb
+    - name: Update AirConnect release files
+      id: update
+      run: ruby scripts/update-airconnect-release.rb
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Update Formula file
-      if: steps.check_version.outputs.update_needed == 'true'
+
+    - name: Run regression checks
+      run: bash tests/airconnect_regression_test.sh
+
+    - name: Verify update diff
+      if: steps.update.outputs.update_needed == 'true'
       run: |
-        echo "🔄 Updating Formula file for version ${{ steps.check_version.outputs.new_version }}"
-        
-        # Create backup of original file
-        cp ${{ env.FORMULA_FILE }} ${{ env.FORMULA_FILE }}.backup
-        
-        # Update url and SHA256 in the Formula file
-        sed -i 's#^  url "https://github.com/philippe44/AirConnect/releases/download/[^"]*/AirConnect-[^"]*\\.zip"$#  url "https://github.com/philippe44/AirConnect/releases/download/${{ steps.check_version.outputs.new_version }}/AirConnect-${{ steps.check_version.outputs.new_version }}.zip"#' ${{ env.FORMULA_FILE }}
-        sed -i 's/sha256 "[^"]*"/sha256 "${{ steps.check_version.outputs.new_sha256 }}"/' ${{ env.FORMULA_FILE }}
-        
-        echo "✅ Updated ${{ env.FORMULA_FILE }}"
-        
-        # Verify the changes
-        echo "📋 Verification:"
-        echo "Before:"
-        grep -E "(url|sha256)" ${{ env.FORMULA_FILE }}.backup
-        echo "After:"
-        grep -E "(url|sha256)" ${{ env.FORMULA_FILE }}
-        
-        # Remove backup file
-        rm ${{ env.FORMULA_FILE }}.backup
-        
-    - name: Update other files
-      if: steps.check_version.outputs.update_needed == 'true'
-      run: |
-        echo "🔄 Updating other files for version ${{ steps.check_version.outputs.new_version }}"
-        
-        # Update the manager script with new version info
-        if [ -f "scripts/airconnect-manager.sh" ]; then
-          sed -i 's/AIRCONNECT_VERSION="[^"]*"/AIRCONNECT_VERSION="${{ steps.check_version.outputs.new_version }}"/' scripts/airconnect-manager.sh
-          echo "✅ Updated airconnect-manager.sh"
-        fi
-        
-        # Update README files with new version
-        if [ -f "README.md" ]; then
-          sed -i 's/Version: [0-9.]*/Version: ${{ steps.check_version.outputs.new_version }}/' README.md
-          echo "✅ Updated README.md"
-        fi
-        
-        if [ -f "README_zh.md" ]; then
-          sed -i 's/版本: [0-9.]*/版本: ${{ steps.check_version.outputs.new_version }}/' README_zh.md
-          echo "✅ Updated README_zh.md"
-        fi
-        
-        # Create changelog entry
-        echo "📝 Creating changelog entry"
-        changelog_file="CHANGELOG.md"
-        if [ ! -f "$changelog_file" ]; then
-          echo "# Changelog" > "$changelog_file"
-          echo "" >> "$changelog_file"
-        fi
-        
-        # Add new entry to changelog
-        {
-          echo "# Changelog"
-          echo ""
-          echo "## [${{ steps.check_version.outputs.new_version }}] - ${{ steps.check_version.outputs.release_date }}"
-          echo ""
-          echo "### Updated"
-          echo "- AirConnect from version ${{ steps.check_version.outputs.current_version }} to ${{ steps.check_version.outputs.new_version }}"
-          echo "- File size: ${{ steps.check_version.outputs.file_size }} MB"
-          echo "- SHA256: ${{ steps.check_version.outputs.new_sha256 }}"
-          echo ""
-          echo "### Release Notes"
-          echo "${{ steps.check_version.outputs.release_notes }}"
-          echo ""
-          tail -n +3 "$changelog_file"
-        } > "${changelog_file}.tmp" && mv "${changelog_file}.tmp" "$changelog_file"
-        
-    - name: Commit changes
-      if: steps.check_version.outputs.update_needed == 'true'
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        
-        # Add only the files we want to commit
-        git add ${{ env.FORMULA_FILE }}
-        git add scripts/ || true
-        git add README.md || true
-        git add README_zh.md || true
-        git add CHANGELOG.md || true
-        
-        # Make sure we don't commit any temporary files
-        git reset .last_version 2>/dev/null || true
-        git reset check_version.rb 2>/dev/null || true
-        
-        # Only commit if there are changes
-        if ! git diff --cached --quiet; then
-          git commit -m "chore: update AirConnect from ${{ steps.check_version.outputs.current_version }} to ${{ steps.check_version.outputs.new_version }}"
-        else
-          echo "No changes to commit"
-        fi
-        
+        ruby -e '
+          expected = %w[
+            Formula/airconnect.rb
+            scripts/airconnect-manager.sh
+            CHANGELOG.md
+          ]
+          changed = `git diff --name-only`.lines.map(&:strip).reject(&:empty?)
+          missing = ["Formula/airconnect.rb"] - changed
+          unexpected = changed - expected
+          abort("Formula/airconnect.rb was not changed") unless missing.empty?
+          abort("Unexpected files changed: #{unexpected.join(", ")}") unless unexpected.empty?
+        '
+
     - name: Create Pull Request
-      if: steps.check_version.outputs.update_needed == 'true'
+      if: steps.update.outputs.update_needed == 'true'
       uses: peter-evans/create-pull-request@v5
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
-        commit-message: "feat: update AirConnect to ${{ steps.check_version.outputs.new_version }}"
-        title: "🚀 Update AirConnect to ${{ steps.check_version.outputs.new_version }}"
+        commit-message: "chore: update AirConnect to ${{ steps.update.outputs.new_version }}"
+        title: "Update AirConnect to ${{ steps.update.outputs.new_version }}"
         body: |
-          ## 🚀 AirConnect Version Update
-          
-          This PR automatically updates AirConnect to the latest upstream version.
-          
-          ### 📋 Changes
-          
+          ## AirConnect Version Update
+
+          This PR updates AirConnect to the latest upstream release.
+
           | Field | Previous | New |
           |-------|----------|-----|
-          | **Version** | `${{ steps.check_version.outputs.current_version }}` | `${{ steps.check_version.outputs.new_version }}` |
-          | **SHA256** | `(updated)` | `${{ steps.check_version.outputs.new_sha256 }}` |
-          | **Release Date** | - | `${{ steps.check_version.outputs.release_date }}` |
-          | **File Size** | - | `${{ steps.check_version.outputs.file_size }} MB` |
-          | **Download URL** | - | ${{ steps.check_version.outputs.download_url }} |
-          
-          ### 📚 Upstream Release Notes
-          
-          ${{ steps.check_version.outputs.release_notes }}
-          
-          ### 🔗 Links
-          
-          - [Upstream Release](https://github.com/${{ env.UPSTREAM_REPO }}/releases/tag/${{ steps.check_version.outputs.new_version }})
-          - [Download Link](${{ steps.check_version.outputs.download_url }})
-          
-          ### ✅ Verification
-          
-          - [x] Downloaded and verified file integrity
-          - [x] Updated version and SHA256 in Formula file
-          - [x] Updated version references in scripts
-          - [x] Updated documentation
-          - [x] Created changelog entry
-          - [x] No temporary files committed
-          
-          ---
-          
-          🤖 This PR was created automatically by GitHub Actions.
-          
-        branch: update-airconnect-${{ steps.check_version.outputs.new_version }}
+          | Version | `${{ steps.update.outputs.current_version }}` | `${{ steps.update.outputs.new_version }}` |
+          | SHA256 | `(updated)` | `${{ steps.update.outputs.new_sha256 }}` |
+          | Release Date | - | `${{ steps.update.outputs.release_date }}` |
+          | File Size | - | `${{ steps.update.outputs.file_size }} MB` |
+          | Download URL | - | ${{ steps.update.outputs.download_url }} |
+
+          ### Upstream Release Notes
+
+          ${{ steps.update.outputs.release_notes_block }}
+
+          ### Verification
+
+          - Downloaded upstream release asset and calculated SHA256.
+          - Updated Formula URL and SHA256.
+          - Updated manager version metadata.
+          - Updated CHANGELOG without duplicate entries.
+          - Ran repository regression checks.
+        branch: update-airconnect-${{ steps.update.outputs.new_version }}
+        add-paths: |
+          Formula/airconnect.rb
+          scripts/airconnect-manager.sh
+          CHANGELOG.md
         delete-branch: true
         draft: false
-
-    - name: Clean up any temporary files
-      if: always()
-      run: |
-        # Remove any temporary files that might have been created
-        rm -f .last_version check_version.rb /tmp/check_version.rb
-        echo "🧹 Cleanup completed"
