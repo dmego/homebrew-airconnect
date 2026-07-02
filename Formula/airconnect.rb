@@ -3,14 +3,14 @@ require "fileutils"
 class Airconnect < Formula
   desc "Use AirPlay to stream to UPnP/Sonos & Chromecast devices"
   homepage "https://github.com/philippe44/AirConnect"
-  url "https://github.com/philippe44/AirConnect/releases/download/1.9.3/AirConnect-1.9.3.zip"
-  sha256 "9ad2bf7397e1c7617c3112dd4c450b5f403a62470ad9e9e6a04db1b0f2f6db73"
+  url "https://github.com/philippe44/AirConnect/releases/download/1.10.1/AirConnect-1.10.1.zip"
+  sha256 "ea0fdad7a1aeb837ee99b2c21aad7e4c3ce84de03c2e86ac64bed804b87588b0"
   license "MIT"
   depends_on :macos
 
   resource "airconnect-support" do
-    url "https://github.com/dmego/homebrew-airconnect/releases/download/airconnect-support-1.9.3/homebrew-airconnect-support-1.9.3.tar.gz"
-    sha256 "127d5aa9816522790d500f10d338d8dcfc8d9f62c86fc9dcb7df719997f2bc33"
+    url "https://github.com/dmego/homebrew-airconnect/releases/download/airconnect-support-1.10.1/homebrew-airconnect-support-1.10.1.tar.gz"
+    sha256 "99f5a60483e42297bf7c350e2d9d473169b00d59a60198ddd255b612b8ddeb5a"
   end
 
   livecheck do
