@@ -6,6 +6,7 @@ class Airconnect < Formula
   url "https://github.com/philippe44/AirConnect/releases/download/1.10.1/AirConnect-1.10.1.zip"
   sha256 "ea0fdad7a1aeb837ee99b2c21aad7e4c3ce84de03c2e86ac64bed804b87588b0"
   license "MIT"
+  revision 1
   depends_on :macos
 
   resource "airconnect-support" do
