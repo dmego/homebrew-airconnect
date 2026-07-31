@@ -144,7 +144,17 @@ class Airconnect < Formula
       else
         ohai "Preserving existing configuration at #{config_file}"
       end
-      
+
+      # Migrate: ensure -Z flag in service ARGS (older configs lacked it, causing high CPU)
+      if config_file.exist?
+        content = config_file.read
+        new_content = content.gsub(/(AIR(?:CAST|UPNP)_ARGS=")(?!-Z)/, '\1-Z ')
+        if new_content != content
+          config_file.write(new_content)
+          ohai "Migrated configuration: added -Z flag to service arguments"
+        end
+      end
+
       # Ensure proper permissions
       config_file.chmod(0644)
       ohai "Configuration file created successfully at #{config_file}"
