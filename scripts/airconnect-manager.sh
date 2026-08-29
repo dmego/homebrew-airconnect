@@ -21,7 +21,7 @@ PID_DIR="$HOMEBREW_PREFIX/var/run"
 
 # Version info
 VERSION="1.0.0"
-AIRCONNECT_VERSION="1.11.1"
+AIRCONNECT_VERSION="1.11.2"
 
 # Colors for output
 RED='\033[0;31m'
