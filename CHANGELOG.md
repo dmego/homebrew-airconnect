@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.12.3] - 2026-09-24
+<!-- airconnect-updater:version=1.12.3 -->
+
+### Updated
+- AirConnect from version 1.11.3 to 1.12.3
+- File size: 90.64 MB
+- SHA256: 5b1d00fb0bf8c6308accdf315b73c98ac7befa45bd73a20396632ce0712cda11
+
+### Release Notes
+
+
 ## [1.11.3] - 2026-09-06
 <!-- airconnect-updater:version=1.11.3 -->
 
