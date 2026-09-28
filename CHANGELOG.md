@@ -8,6 +8,14 @@
 - File size: 90.64 MB
 - SHA256: 5b1d00fb0bf8c6308accdf315b73c98ac7befa45bd73a20396632ce0712cda11
 
+## [1.12.2] - 2026-09-22
+<!-- airconnect-updater:version=1.12.2 -->
+
+### Updated
+- AirConnect from version 1.11.3 to 1.12.2
+- File size: 90.64 MB
+- SHA256: f069640ac817039ecbf619408b82c49584db5dc92e8cad3dc776a13abda96714
+
 ### Release Notes
 
 
@@ -73,4 +81,3 @@
 - SHA256: f103595c522b0a4eeca8cb02301a35005d069d4298991ae82e9c312ddb7c8270
 
 ### Release Notes
-
